@@ -1,0 +1,66 @@
+# Git ignore for VTCS Cyber Range
+
+# ===========================================
+# CRITICAL: SECRETS - NEVER COMMIT THESE
+# ===========================================
+
+# SSH keys (private)
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+
+# WireGuard configs (contain private keys)
+*.conf
+!.env.example
+
+# Environment files with secrets
+.env
+*.env.local
+*.env.production
+
+# ===========================================
+# USER PACKAGES - Distributed separately
+# ===========================================
+# Entire user-packages folder is excluded
+# These contain SSH keys, VPN configs, and credentials
+# Distribute to users via secure channel (USB, encrypted transfer)
+user-packages/
+
+# ===========================================
+# GENERAL IGNORES
+# ===========================================
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+__pycache__/
+*.pyc
+node_modules/
+
+# Docker volumes (if mounted locally for testing)
+data/
+volumes/
+
+# Backup files
+*.bak
+*.backup
