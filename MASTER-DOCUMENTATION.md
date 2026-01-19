@@ -111,6 +111,9 @@ Red ←──────→ Blue  (BLOCKED - no direct communication)
 | root | Emergency only | Contabo key | Yes |
 
 ### Lab VM Users
+
+> 💡 **Admins can use `ssh labvm` from VDS** - SSH config auto-selects key and username.
+
 | Username | Purpose | SSH Key | ForceCommand |
 |----------|---------|---------|--------------|
 | labadmin1 | Admin | labvm_admin1.key | No (full shell) |
@@ -151,8 +154,9 @@ Red ←──────→ Blue  (BLOCKED - no direct communication)
 - ✅ Shared services network for legitimate targets only
 
 ### Authentication Security
-- ✅ SSH key OR password authentication for admins
+- ✅ SSH key-only authentication (password auth disabled)
 - ✅ Unique SSH key per user
+- ✅ SSH config on VDS enables `ssh labvm` shortcut for admins
 - ✅ ForceCommand restricts students to containers
 - ✅ No port/X11/agent forwarding for students
 - ✅ VPN IPs whitelisted in fail2ban (won't lock out admins)

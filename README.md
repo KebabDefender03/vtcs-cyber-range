@@ -123,15 +123,17 @@ See [docs/security.md](docs/security.md) for complete security documentation.
 
 ## Authentication
 
-Access is via SSH keys and/or passwords (admins only):
+Access is via SSH keys (password auth is disabled):
 
 | Role | Access | Auth Method |
 |------|--------|-------------|
-| Admin | VDS host + Lab VM (full shell) | SSH key OR password |
-| Instructor | Lab VM (shell + docker) | SSH key |
-| Student | Lab VM → auto-exec into container | SSH key |
+| Admin | VDS host + Lab VM (full shell) | SSH key only |
+| Instructor | Lab VM (shell + docker) | SSH key only |
+| Student | Lab VM → auto-exec into container | SSH key only |
 
-See [MASTER-DOCUMENTATION.md](MASTER-DOCUMENTATION.md) for key distribution.
+> 💡 **Admins**: Use `ssh labvm` from VDS to connect to Lab VM (SSH config auto-selects key).
+
+See [MASTER-DOCUMENTATION.md](MASTER-DOCUMENTATION.md) for full access matrix.
 
 ## Recovery Options
 

@@ -204,7 +204,19 @@ The following are excluded via `.gitignore`:
 
 - Host logs: 4 weeks (logrotate)
 - Container logs: 10MB per container, 3 files max
-- Consider centralized logging for production use
+
+### Security Note on Logging
+
+**Lab VM logs are NOT tamper-proof.** If a container escape occurs, an attacker could:
+- Delete or modify logs on Lab VM
+- Hide their tracks before detection
+
+**Mitigation options (not yet implemented):**
+1. **Syslog forwarding to VDS** - Logs stream in real-time, survive Lab VM compromise
+2. **VM snapshots** - Restore to known-good state after incidents
+3. **Accept risk** - For training purposes, reset environment if compromised
+
+Current approach: Logs on Lab VM + regular snapshots. Admins can investigate via VDS Cockpit.
 
 ## Incident Response
 
@@ -230,8 +242,8 @@ virsh snapshot-revert labvm clean-baseline
 ## Security Hardening Checklist
 
 ### Host Hardening
-- [x] Disable root SSH login (after admin user created)
-- [x] SSH key-only authentication
+- [x] Root SSH restricted to key-only (admin1 key also authorized for emergency)
+- [x] SSH key-only authentication (PasswordAuthentication no)
 - [x] Automatic security updates (unattended-upgrades)
 - [x] fail2ban for SSH protection
 - [x] nftables firewall with default deny

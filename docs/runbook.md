@@ -381,8 +381,8 @@ virsh start labvm
 | System | Username | Authentication |
 |--------|----------|----------------|
 | VDS | admin1/2/3 | SSH key (host_adminX.key) |
-| VDS | root | SSH key + Contabo password (emergency) |
-| Lab VM | labadmin1/2/3 | SSH key (labvm_adminX.key) |
+| VDS | root | SSH key (admin1 key authorized) + Contabo VNC password |
+| Lab VM | labadmin1/2/3 | `ssh labvm` from VDS (auto-uses key) |
 | Lab VM | instructor1/2 | SSH key (labvm_instructorX.key) |
 | Lab VM | red1/2/3, blue1/2/3 | SSH key + ForceCommand |
 | WebApp DB | labuser | labpass123 |
