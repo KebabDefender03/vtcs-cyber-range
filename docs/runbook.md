@@ -284,11 +284,11 @@ virsh snapshot-list labvm
 
 ### Start Lab Session
 
-Start containers via Portainer (https://10.200.0.1:9443) or:
-```bash
-# On Lab VM
-docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
-```
+Start containers via Portainer (https://10.200.0.1:9443):
+1. Go to Stacks → vtcs
+2. Click "Start" or redeploy if needed
+
+> **Note**: The vtcs stack is deployed from GitHub (KebabDefender03/vtcs-cyber-range).
 
 ### Phase Control (Instructor/Admin)
 
@@ -318,15 +318,13 @@ sudo /opt/cyberlab/scripts/lab.sh phase
 
 ### End Lab Session
 
-Stop containers via Portainer or:
-```bash
-# On Lab VM
-docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml down
-```
+Stop containers via Portainer (https://10.200.0.1:9443):
+1. Go to Stacks → vtcs
+2. Click "Stop" to stop all containers
 
 ### Reset Between Sessions
 
-Reset via Portainer (recreate containers) or restore VM snapshot:
+Reset via Portainer (redeploy stack) or restore VM snapshot:
 ```bash
 # On VDS
 virsh snapshot-revert labvm clean-baseline

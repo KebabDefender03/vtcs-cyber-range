@@ -97,7 +97,7 @@ sudo /opt/cyberlab/scripts/lab.sh combat    # Enable combat phase
 sudo /opt/cyberlab/scripts/lab.sh phase     # Check current phase
 ```
 
-> 💡 Phase control runs on VDS and executes via SSH to Lab VM. Container management is done via Portainer.
+> 💡 Phase control runs on VDS and executes via SSH to Lab VM. Container management (start/stop) is done via Portainer (https://10.200.0.1:9443).
 
 ### Traffic Flow Matrix
 

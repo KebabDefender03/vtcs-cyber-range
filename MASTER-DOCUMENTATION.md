@@ -378,9 +378,6 @@ docker ps -a
 # View container logs
 docker logs -f red1
 
-# Restart all containers
-cd /opt/cyberlab/scenarios/base && docker compose restart
-
 # Resource usage
 docker stats
 
@@ -388,7 +385,9 @@ docker stats
 docker exec -it red1 /bin/bash
 ```
 
+> **Note**: Container start/stop/restart is managed via Portainer (https://10.200.0.1:9443).
+
 ---
-**Document Version:** 1.0
-**Last Updated:** $(date)
+**Document Version:** 1.1
+**Last Updated:** January 2026
 **Classification:** Internal Use Only

@@ -12,7 +12,6 @@ id_ed25519*
 
 # WireGuard configs (contain private keys)
 *.conf
-!.env.example
 
 # Environment files with secrets
 .env

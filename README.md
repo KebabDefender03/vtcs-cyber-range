@@ -52,12 +52,10 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture.
    # ... continue with runbook
    ```
 
-3. **Start Lab Environment** (via Portainer or on Lab VM)
-   ```bash
-   # Via Portainer: https://10.200.0.1:9443
-   # Or on Lab VM:
-   docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
-   ```
+3. **Start Lab Environment** (via Portainer)
+   - Access Portainer: https://10.200.0.1:9443
+   - Deploy the "vtcs" stack from GitHub repository
+   - Stack is deployed directly from `scenarios/base/docker-compose.yml`
 
 ## Repository Structure
 
@@ -74,10 +72,9 @@ VDS/
 │       └── 01-labvm-bootstrap.sh
 ├── scenarios/
 │   └── base/                 # Default lab scenario
-│       ├── docker-compose.yml
-│       └── .env.example
+│       └── docker-compose.yml  # Deployed via Portainer from GitHub
 ├── scripts/
-│   └── lab.sh                # Lab management CLI
+│   └── lab.sh                # Phase control CLI (runs on VDS)
 ├── docs/
 │   ├── architecture.md       # System architecture
 │   ├── security.md           # Security controls
@@ -85,6 +82,8 @@ VDS/
 ├── Makefile                  # Convenience targets
 └── README.md
 ```
+
+> **Note**: Docker Compose is deployed via Portainer from this GitHub repo, not stored locally on Lab VM.
 
 ## Lab Management
 
@@ -134,7 +133,7 @@ Access is via SSH keys (password auth is disabled for admins):
 |------|--------|-------------|
 | Admin | VDS host + Lab VM (full shell) | SSH key only |
 | Instructor | VDS host (lab.sh only) + Portainer + Cockpit | Password |
-| Student | Lab VM → auto-exec into container | SSH key only |
+| Student | VDS host → ForceCommand → container | SSH key only |
 
 > 💡 **Admins**: Use `ssh labvm` from VDS to connect to Lab VM (SSH config auto-selects key).
 > 💡 **Instructors**: Use Portainer (https://10.200.0.1:9443) for container management.

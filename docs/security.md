@@ -358,3 +358,6 @@ This environment is for **educational purposes only**:
 - No production systems
 - Isolated from university networks
 - Students sign acceptable use agreement
+
+---
+**Last Updated:** January 2026
