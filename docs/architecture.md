@@ -76,6 +76,22 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 | red_net | 172.20.2.0/24 | Red team internal | Red1, Red2, Red3 |
 | services_net | 172.20.3.0/24 | Shared targets | WebApp, Database, Workstation, All workspaces |
 
+### Phase-Based Traffic Control
+
+The lab operates in two phases controlled by the instructor:
+
+| Phase | Internet Access | Cross-Team (Red ↔ Blue) | Duration |
+|-------|-----------------|-------------------------|----------|
+| **Preparation** | ✅ ENABLED | ❌ BLOCKED | First ~30 min |
+| **Combat** | ❌ DISABLED | ✅ ENABLED | Rest of session |
+
+**Phase commands:**
+```bash
+./scripts/lab.sh prep      # Enable preparation phase
+./scripts/lab.sh combat    # Enable combat phase
+./scripts/lab.sh phase     # Check current phase
+```
+
 ### Traffic Flow Matrix
 
 | From → To | Internet | VPN | Host | Lab VM | Blue | Red | Services |
@@ -84,8 +100,8 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 | VPN | ✗ | - | ✓ | ✓ | Via LVM | Via LVM | Via LVM |
 | Host | ✓ | ✓ | - | ✓ | Via LVM | Via LVM | Via LVM |
 | Lab VM | Controlled | ✓ | ✓ | - | ✓ | ✓ | ✓ |
-| Blue | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ |
-| Red | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ |
+| Blue | Phase-based | ✗ | ✗ | ✗ | ✓ | Phase-based | ✓ |
+| Red | Phase-based | ✗ | ✗ | ✗ | Phase-based | ✓ | ✓ |
 | Services | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ |
 
 ## Component Details

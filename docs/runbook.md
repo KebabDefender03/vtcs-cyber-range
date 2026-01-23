@@ -293,6 +293,27 @@ cd /opt/cyberlab
 ./scripts/lab.sh start
 ```
 
+### Phase Control (Instructor/Admin)
+
+```bash
+# Start with preparation phase (internet ON, cross-team OFF)
+./scripts/lab.sh prep
+
+# When students are ready, switch to combat phase
+./scripts/lab.sh combat
+
+# Check current phase status
+./scripts/lab.sh phase
+```
+
+**Typical session workflow:**
+1. `./scripts/lab.sh start` - Start containers
+2. `./scripts/lab.sh prep` - Enable preparation phase (~30 min)
+3. Students download tools, set up their environments
+4. `./scripts/lab.sh combat` - Enable combat phase (rest of session)
+5. Red vs Blue battle begins!
+6. `./scripts/lab.sh stop` - End session
+
 ### End Lab Session
 
 ```bash

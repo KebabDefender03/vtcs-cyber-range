@@ -109,10 +109,30 @@ VDS/
 ./scripts/lab.sh ssh-info
 ```
 
+## Phase Control
+
+The lab supports two phases for structured training sessions:
+
+```bash
+# Preparation phase: Internet ON, cross-team attacks OFF
+./scripts/lab.sh prep
+
+# Combat phase: Internet OFF, cross-team attacks ON  
+./scripts/lab.sh combat
+
+# Check current phase
+./scripts/lab.sh phase
+```
+
+| Phase | Internet | Red ↔ Blue | Duration |
+|-------|----------|------------|----------|
+| **Preparation** | ✅ ON | ❌ OFF | First ~30 min |
+| **Combat** | ❌ OFF | ✅ ON | Rest of session |
+
 ## Security Features
 
 - **VPN-only access**: No services exposed to internet except WireGuard
-- **Network segmentation**: Red/Blue teams fully isolated, shared target zone only
+- **Phase-based control**: Internet and cross-team access controlled per phase
 - **Per-user SSH keys**: Each user has unique keypair with ForceCommand
 - **Egress control**: Containers have no internet access by default
 - **Resource limits**: CPU/memory limits prevent resource exhaustion

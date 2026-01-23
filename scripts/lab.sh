@@ -44,6 +44,11 @@ print_usage() {
     echo "  build       Build/rebuild container images"
     echo "  ssh-info    Show SSH connection info for workspaces"
     echo ""
+    echo "Phase Control:"
+    echo "  prep        Preparation phase: Internet ON, cross-team attacks OFF"
+    echo "  combat      Combat phase: Internet OFF, cross-team attacks ON"
+    echo "  phase       Show current phase status"
+    echo ""
     echo "Options:"
     echo "  -s, --scenario <name>   Use specific scenario (default: base)"
     echo "  -c, --container <name>  Target specific container"
@@ -55,6 +60,8 @@ print_usage() {
     echo "  $0 logs -c webapp -f        # Follow webapp logs"
     echo "  $0 shell -c red1            # Open shell in red1 workspace"
     echo "  $0 reset                    # Reset to clean state"
+    echo "  $0 prep                     # Enable preparation phase"
+    echo "  $0 combat                   # Enable combat phase"
     echo ""
 }
 
@@ -197,6 +204,126 @@ cmd_build() {
     log_info "Build complete"
 }
 
+# ============================================================================
+# PHASE CONTROL FUNCTIONS
+# ============================================================================
+# Controls network access between phases:
+# - Preparation: Internet ON, cross-team attacks OFF
+# - Combat: Internet OFF, cross-team attacks ON
+# ============================================================================
+
+PHASE_FILE="/tmp/cyberlab-phase"
+RED_NET="172.20.2.0/24"
+BLUE_NET="172.20.1.0/24"
+DOCKER_NETS="172.20.0.0/16"
+
+cmd_prep() {
+    log_info "Activating PREPARATION phase..."
+    echo ""
+    echo -e "${YELLOW}┌────────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│         PREPARATION PHASE                  │${NC}"
+    echo -e "${YELLOW}│  • Internet access: ENABLED                │${NC}"
+    echo -e "${YELLOW}│  • Cross-team attacks: DISABLED            │${NC}"
+    echo -e "${YELLOW}│  • Students can download tools             │${NC}"
+    echo -e "${YELLOW}└────────────────────────────────────────────┘${NC}"
+    echo ""
+    
+    # Clear any existing phase rules
+    iptables -t nat -D POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE 2>/dev/null || true
+    iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP 2>/dev/null || true
+    iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP 2>/dev/null || true
+    
+    # PREP: Enable internet (NAT masquerade)
+    log_info "Enabling internet access for containers..."
+    iptables -t nat -A POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE
+    
+    # PREP: Block cross-team traffic
+    log_info "Blocking cross-team attacks..."
+    iptables -I FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP
+    iptables -I FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP
+    
+    # Save phase state
+    echo "prep" > ${PHASE_FILE}
+    echo "$(date '+%Y-%m-%d %H:%M:%S')" >> ${PHASE_FILE}
+    
+    log_info "Preparation phase ACTIVE"
+    echo ""
+    echo "Students can now download tools. Run '$0 combat' when ready to begin."
+}
+
+cmd_combat() {
+    log_info "Activating COMBAT phase..."
+    echo ""
+    echo -e "${RED}┌────────────────────────────────────────────┐${NC}"
+    echo -e "${RED}│            COMBAT PHASE                    │${NC}"
+    echo -e "${RED}│  • Internet access: DISABLED               │${NC}"
+    echo -e "${RED}│  • Cross-team attacks: ENABLED             │${NC}"
+    echo -e "${RED}│  • Red vs Blue - FIGHT!                    │${NC}"
+    echo -e "${RED}└────────────────────────────────────────────┘${NC}"
+    echo ""
+    
+    # Clear any existing phase rules
+    iptables -t nat -D POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE 2>/dev/null || true
+    iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP 2>/dev/null || true
+    iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP 2>/dev/null || true
+    
+    # COMBAT: Disable internet (remove NAT)
+    log_info "Disabling internet access..."
+    # NAT rule already removed above
+    
+    # COMBAT: Enable cross-team traffic
+    log_info "Enabling cross-team attacks..."
+    iptables -I FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT
+    iptables -I FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT
+    
+    # Save phase state
+    echo "combat" > ${PHASE_FILE}
+    echo "$(date '+%Y-%m-%d %H:%M:%S')" >> ${PHASE_FILE}
+    
+    log_info "Combat phase ACTIVE"
+    echo ""
+    echo -e "${RED}⚔️  LET THE BATTLE BEGIN! ⚔️${NC}"
+}
+
+cmd_phase() {
+    echo -e "${BLUE}=== Current Phase Status ===${NC}"
+    echo ""
+    
+    if [[ -f ${PHASE_FILE} ]]; then
+        current_phase=$(head -1 ${PHASE_FILE})
+        phase_time=$(tail -1 ${PHASE_FILE})
+        
+        if [[ "$current_phase" == "prep" ]]; then
+            echo -e "Current Phase: ${YELLOW}PREPARATION${NC}"
+            echo "  • Internet: ENABLED"
+            echo "  • Cross-team: BLOCKED"
+        elif [[ "$current_phase" == "combat" ]]; then
+            echo -e "Current Phase: ${RED}COMBAT${NC}"
+            echo "  • Internet: DISABLED"
+            echo "  • Cross-team: ENABLED"
+        fi
+        echo ""
+        echo "Phase activated: ${phase_time}"
+    else
+        echo -e "Current Phase: ${NC}UNKNOWN (no phase set)${NC}"
+        echo ""
+        echo "Run '$0 prep' to start preparation phase"
+        echo "Run '$0 combat' to start combat phase"
+    fi
+    
+    echo ""
+    echo -e "${BLUE}=== Network Rules ===${NC}"
+    echo "NAT (internet):"
+    iptables -t nat -L POSTROUTING -n 2>/dev/null | grep -E "MASQUERADE|172.20" || echo "  No NAT rules"
+    echo ""
+    echo "Forward (cross-team):"
+    iptables -L FORWARD -n 2>/dev/null | grep -E "172.20" | head -4 || echo "  No cross-team rules"
+}
+
 cmd_ssh_info() {
     echo -e "${BLUE}=== SSH Connection Information ===${NC}"
     echo ""
@@ -241,7 +368,7 @@ while [[ $# -gt 0 ]]; do
             print_usage
             exit 0
             ;;
-        start|stop|restart|status|reset|logs|shell|build|ssh-info)
+        start|stop|restart|status|reset|logs|shell|build|ssh-info|prep|combat|phase)
             COMMAND="$1"
             shift
             ;;
@@ -281,6 +408,9 @@ case $COMMAND in
     shell)      cmd_shell ;;
     build)      cmd_build ;;
     ssh-info)   cmd_ssh_info ;;
+    prep)       cmd_prep ;;
+    combat)     cmd_combat ;;
+    phase)      cmd_phase ;;
     *)
         log_error "Unknown command: $COMMAND"
         print_usage

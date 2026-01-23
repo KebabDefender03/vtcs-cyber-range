@@ -69,26 +69,43 @@
 
 ## Network Segmentation
 
+### Phase-Based Access Control
+
+The lab operates in two phases to support structured training sessions:
+
+| Phase | Command | Internet | Red ↔ Blue | Purpose |
+|-------|---------|----------|------------|---------|
+| **Preparation** | `./scripts/lab.sh prep` | ✅ ON | ❌ OFF | Download tools, setup |
+| **Combat** | `./scripts/lab.sh combat` | ❌ OFF | ✅ ON | Attack/defend exercise |
+
+Check current phase: `./scripts/lab.sh phase`
+
 ### Why Segmentation Matters
-- **Red team cannot attack Blue team directly** - Only through shared services
-- **Blue team cannot see Red team traffic** - Prevents cheating
+- **Preparation phase**: Teams download tools without being attacked
+- **Combat phase**: Cross-team attacks enabled, no external help (internet off)
 - **Both teams share targets** - Realistic attack/defend scenario
 
-### Docker Network Isolation
+### Docker Network Layout
 
 | Network | Subnet | Containers | Can Reach |
 |---------|--------|------------|-----------|
-| `red_net` | 172.20.2.0/24 | red1, red2, red3 | services_net only |
-| `blue_net` | 172.20.1.0/24 | blue1, blue2, blue3 | services_net only |
+| `red_net` | 172.20.2.0/24 | red1, red2, red3 | services_net + blue_net (combat only) |
+| `blue_net` | 172.20.1.0/24 | blue1, blue2, blue3 | services_net + red_net (combat only) |
 | `services_net` | 172.20.3.0/24 | webapp, database, workstation | Internal only |
 
 ### Traffic Flow
 ```
-Red Team ──────┐
-               ├───► services_net (webapp, db)
-Blue Team ─────┘
-       ✗
-Red ←──────→ Blue  (BLOCKED - no direct communication)
+PREPARATION PHASE:                      COMBAT PHASE:
+                                        
+Red Team ──────┐                        Red Team ◄─────► Blue Team
+               │                              │              │
+               ├───► services_net             └──────┬───────┘
+               │                                     │
+Blue Team ─────┘                                     ▼
+       ✗                                      services_net
+Red ←───✗───→ Blue                         (webapp, db, workstation)
+
+Internet: ✅ ON                           Internet: ❌ OFF
 ```
 
 ## Access Matrix

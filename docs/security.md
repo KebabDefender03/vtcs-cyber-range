@@ -99,44 +99,46 @@ chain output { policy accept; }
 
 Docker networks provide Layer 2 isolation:
 - Containers only see traffic on their attached networks
-- No routing between blue_net and red_net
+- Routing between blue_net and red_net is controlled by phase
 - services_net is shared for controlled target access
 
-## Egress Control
+## Egress Control & Phase Management
 
-### Default: No Internet Access
+### Phase-Based Access Control
 
-By default, workspace containers have no route to the internet:
-- Docker networks are internal bridges
-- No NAT masquerading for container traffic to internet
-- Prevents data exfiltration and C2 communication
+The lab supports two operational phases:
 
-### Controlled Egress (If Required)
+| Phase | Command | Internet | Cross-Team Attacks |
+|-------|---------|----------|-------------------|
+| **Preparation** | `./scripts/lab.sh prep` | ✅ Enabled | ❌ Blocked |
+| **Combat** | `./scripts/lab.sh combat` | ❌ Disabled | ✅ Enabled |
 
-If scenarios require internet access (e.g., downloading tools):
+**Check current phase:** `./scripts/lab.sh phase`
 
-**Option 1: Pre-built Images**
-- Include all necessary tools in container images
-- No runtime internet access needed
+### Preparation Phase
+- Students can download tools, updates, and packages
+- Cross-team attacks are blocked (fair preparation time)
+- Typical duration: First 30 minutes of session
 
-**Option 2: Proxy with Allowlist**
-```yaml
-# Add to docker-compose.yml
-proxy:
-  image: squid
-  networks:
-    - services_net
-  environment:
-    - ALLOWED_DOMAINS=github.com,*.githubusercontent.com
-```
+### Combat Phase
+- Internet access is cut (no external help)
+- Cross-team attacks enabled (Red vs Blue!)
+- This is the active exercise period
 
-**Option 3: Time-limited Access**
+### Technical Implementation
+
+Phase control uses iptables rules on the Lab VM:
+
 ```bash
-# Temporarily enable egress
-iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -j MASQUERADE
+# Preparation Phase (in lab.sh prep):
+iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Enable NAT
+iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j DROP          # Block red→blue
+iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j DROP          # Block blue→red
 
-# Disable after updates
-iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -j MASQUERADE
+# Combat Phase (in lab.sh combat):
+iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Disable NAT
+iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j ACCEPT        # Allow red→blue
+iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j ACCEPT        # Allow blue→red
 ```
 
 ## Secrets Management
