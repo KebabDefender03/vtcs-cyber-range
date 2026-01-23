@@ -183,24 +183,24 @@ scp -r /tmp/cyberlab/* labadmin@192.168.122.X:/opt/cyberlab/
 ```bash
 # On Lab VM
 cd /opt/cyberlab
-chmod +x scripts/*.sh
 
-# Build and start
-./scripts/lab.sh build
-./scripts/lab.sh start
+# Build and start containers
+docker compose -f scenarios/base/docker-compose.yml build
+docker compose -f scenarios/base/docker-compose.yml up -d
 ```
 
 **Expected output**: All containers started.
 
 ### Step 3.3: Verify Lab Status
 
+Use Portainer (https://10.200.0.1:9443) or:
+
 ```bash
-./scripts/lab.sh status
+docker ps
 ```
 
 **Expected output**:
 ```
-=== Container Status ===
 NAME       STATUS         PORTS
 blue1      Up             22/tcp
 blue2      Up             22/tcp
@@ -210,12 +210,6 @@ red2       Up             22/tcp
 red3       Up             22/tcp
 webapp     Up             127.0.0.1:8080->80/tcp
 database   Up             3306/tcp
-```
-
-### Step 3.4: Get Workspace Connection Info
-
-```bash
-./scripts/lab.sh ssh-info
 ```
 
 ---
@@ -268,10 +262,13 @@ scp root@10.200.0.1:/tmp/student-vpn-configs.tar.gz ./
 ### Step 5.1: Clean State Snapshot
 
 ```bash
-# On VDS, ensure lab is in clean state
-ssh labadmin@192.168.122.X "cd /opt/cyberlab && ./scripts/lab.sh reset"
+# On VDS, ensure lab containers are fresh via Portainer
+# Or reset via docker on Lab VM:
+ssh labvm
+docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml down -v
+docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
 
-# Wait for reset to complete, then create snapshot
+# Create snapshot from VDS
 virsh snapshot-create-as labvm clean-baseline "Clean lab baseline"
 ```
 
@@ -287,47 +284,49 @@ virsh snapshot-list labvm
 
 ### Start Lab Session
 
+Start containers via Portainer (https://10.200.0.1:9443) or:
 ```bash
 # On Lab VM
-cd /opt/cyberlab
-./scripts/lab.sh start
+docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
 ```
 
 ### Phase Control (Instructor/Admin)
 
+Phase control runs from VDS Host (not Lab VM):
+
 ```bash
+# SSH to VDS as admin or instructor
+ssh admin1@10.200.0.1
+
 # Start with preparation phase (internet ON, cross-team OFF)
-./scripts/lab.sh prep
+sudo /opt/cyberlab/scripts/lab.sh prep
 
 # When students are ready, switch to combat phase
-./scripts/lab.sh combat
+sudo /opt/cyberlab/scripts/lab.sh combat
 
 # Check current phase status
-./scripts/lab.sh phase
+sudo /opt/cyberlab/scripts/lab.sh phase
 ```
 
 **Typical session workflow:**
-1. `./scripts/lab.sh start` - Start containers
-2. `./scripts/lab.sh prep` - Enable preparation phase (~30 min)
+1. Start containers via Portainer (https://10.200.0.1:9443)
+2. `sudo /opt/cyberlab/scripts/lab.sh prep` - Enable preparation phase (~30 min)
 3. Students download tools, set up their environments
-4. `./scripts/lab.sh combat` - Enable combat phase (rest of session)
+4. `sudo /opt/cyberlab/scripts/lab.sh combat` - Enable combat phase (rest of session)
 5. Red vs Blue battle begins!
-6. `./scripts/lab.sh stop` - End session
+6. Stop containers via Portainer or restore snapshot via Cockpit
 
 ### End Lab Session
 
+Stop containers via Portainer or:
 ```bash
-./scripts/lab.sh stop
+# On Lab VM
+docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml down
 ```
 
 ### Reset Between Sessions
 
-```bash
-./scripts/lab.sh reset
-```
-
-### Full Reset (Snapshot Restore)
-
+Reset via Portainer (recreate containers) or restore VM snapshot:
 ```bash
 # On VDS
 virsh snapshot-revert labvm clean-baseline
@@ -336,18 +335,19 @@ virsh start labvm
 
 ### View Logs
 
+Via Portainer or:
 ```bash
-# All containers
-./scripts/lab.sh logs
-
-# Specific container
-./scripts/lab.sh logs -c webapp -f
+# On Lab VM
+docker logs -f webapp
+docker logs -f red1
 ```
 
 ### Shell into Container
 
+Via Portainer exec or:
 ```bash
-./scripts/lab.sh shell -c red1
+# On Lab VM
+docker exec -it red1 /bin/bash
 ```
 
 ---
@@ -359,6 +359,28 @@ virsh start labvm
 1. Check WireGuard is running: `systemctl status wg-quick@wg0`
 2. Check firewall allows UDP 51820: `nft list ruleset | grep 51820`
 3. Check peer config matches: `wg show`
+
+### Can't Access Cockpit/Portainer via VPN
+
+**Symptom**: Connected to VPN but https://10.200.0.1:9090 or :9443 doesn't load.
+
+**Root Cause**: nftables rules may use interface index (`iif 3`) instead of name. Interface indices change after reboot.
+
+**Fix**:
+```bash
+# Check current wg0 interface index
+ip link show wg0  # Note: index may have changed from 3 to something else
+
+# Update nftables to use interface NAME instead of index
+sed -i 's/iif 3/iif "wg0"/g' /etc/nftables.conf
+sed -i 's/iif 13/iif "wg0"/g' /etc/nftables.conf  # or whatever current index
+
+# Reload rules
+nft -f /etc/nftables.conf
+
+# Verify
+nft list ruleset | grep 9090
+```
 
 ### Can't SSH After Firewall Setup
 
@@ -402,17 +424,21 @@ virsh start labvm
 | System | Username | Authentication |
 |--------|----------|----------------|
 | VDS | admin1/2/3 | SSH key (host_adminX.key) |
+| VDS | instructor1/2 | Password (SSH to VDS, sudo for lab.sh only) |
 | VDS | root | SSH key (admin1 key authorized) + Contabo VNC password |
+| Cockpit | admin/instructor | Same as VDS password |
+| Portainer | admin/instructor | Separate Portainer account |
 | Lab VM | labadmin1/2/3 | `ssh labvm` from VDS (auto-uses key) |
-| Lab VM | instructor1/2 | SSH key (labvm_instructorX.key) |
 | Lab VM | red1/2/3, blue1/2/3 | SSH key + ForceCommand |
-| WebApp DB | labuser | labpass123 |
+| DVWA | admin | password (default DVWA login) |
 
 ### Important Files
 
 | File | Location | Purpose |
 |------|----------|---------|
 | WireGuard config | `/etc/wireguard/wg0.conf` | VPN server |
-| Firewall rules | `/etc/nftables.conf` | Host firewall |
+| Firewall rules (VDS) | `/etc/nftables.conf` + iptables | Host firewall |
+| Lab script (VDS) | `/opt/cyberlab/scripts/lab.sh` | Phase control CLI |
+| Portainer SSH key | `/root/.ssh/portainer_labvm` | Lab VM control |
 | Docker compose | `/opt/cyberlab/scenarios/base/docker-compose.yml` | Lab definition |
-| Lab script | `/opt/cyberlab/scripts/lab.sh` | Management CLI |
+| Portainer agent | Lab VM Docker | Container management |

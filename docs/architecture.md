@@ -21,8 +21,10 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 │  │  • WireGuard VPN Server (10.200.0.1)                                    ││
 │  │  • SSH (VPN-only, port 22)                                              ││
 │  │  • Cockpit (VPN-only, port 9090) - includes monitoring                  ││
+│  │  • Portainer (VPN-only, port 9443) - container management               ││
+│  │  • Lab control scripts (/opt/cyberlab/scripts/lab.sh)                   ││
 │  │  • KVM/libvirt hypervisor                                               ││
-│  │  • nftables firewall                                                    ││
+│  │  • nftables + iptables firewall                                         ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 │                                    │                                         │
 │                                    │ virbr0 (192.168.122.0/24)              │
@@ -70,11 +72,14 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 
 ### Docker Networks (Lab VM internal)
 
-| Network | Subnet | Purpose | Containers |
+| Network | Subnet | Gateway | Containers |
 |---------|--------|---------|------------|
-| blue_net | 172.20.1.0/24 | Blue team internal | Blue1, Blue2, Blue3 |
-| red_net | 172.20.2.0/24 | Red team internal | Red1, Red2, Red3 |
-| services_net | 172.20.3.0/24 | Shared targets | WebApp, Database, Workstation, All workspaces |
+| blue_net | 172.20.1.0/24 | 172.20.1.1 | blue1 (.11), blue2 (.12), blue3 (.13) |
+| red_net | 172.20.2.0/24 | 172.20.2.1 | red1 (.11), red2 (.12), red3 (.13) |
+| services_net | 172.20.3.0/24 | 172.20.3.1 | database (.20), webapp (.30), workstation (.50) |
+| bridge | 172.17.0.0/16 | 172.17.0.1 | portainer_agent (.2) |
+
+> 💡 Networks are named `blue_net`, `red_net`, `services_net` (no prefix). Team containers also connect to services_net for target access.
 
 ### Phase-Based Traffic Control
 
@@ -85,12 +90,14 @@ The lab operates in two phases controlled by the instructor:
 | **Preparation** | ✅ ENABLED | ❌ BLOCKED | First ~30 min |
 | **Combat** | ❌ DISABLED | ✅ ENABLED | Rest of session |
 
-**Phase commands:**
+**Phase commands (run on VDS as admin or instructor):**
 ```bash
-./scripts/lab.sh prep      # Enable preparation phase
-./scripts/lab.sh combat    # Enable combat phase
-./scripts/lab.sh phase     # Check current phase
+sudo /opt/cyberlab/scripts/lab.sh prep      # Enable preparation phase
+sudo /opt/cyberlab/scripts/lab.sh combat    # Enable combat phase
+sudo /opt/cyberlab/scripts/lab.sh phase     # Check current phase
 ```
+
+> 💡 Phase control runs on VDS and executes via SSH to Lab VM. Container management is done via Portainer.
 
 ### Traffic Flow Matrix
 
@@ -113,9 +120,12 @@ The lab operates in two phases controlled by the instructor:
 | Ubuntu | 24.04 LTS | Host operating system |
 | WireGuard | Latest | VPN server |
 | nftables | Latest | Host firewall |
+| iptables | Latest | Additional firewall (Lab VM isolation) |
 | KVM/QEMU | Latest | Virtualization |
 | libvirt | Latest | VM management |
 | Cockpit | Latest | Web-based VM management |
+| Portainer | CE 2.x | Docker container management |
+| Docker | Latest | For Portainer only |
 
 ### Lab VM Layer
 
@@ -124,7 +134,11 @@ The lab operates in two phases controlled by the instructor:
 | Ubuntu | 24.04 LTS | Guest operating system |
 | Docker | Latest | Container runtime |
 | Docker Compose | v2 | Container orchestration |
+| Portainer Agent | Latest | Remote management from VDS |
 | nftables | Latest | VM firewall |
+
+> ⚠️ **Security Note**: Lab VM is considered "expendable" - all control scripts run on VDS.
+> If Lab VM is compromised via container escape, it cannot affect VDS control plane.
 
 
 ## Monitoring
@@ -162,8 +176,9 @@ Monitoring is provided via **Cockpit** - a simple, built-in web console that req
 | workstation | Ubuntu 22.04 | 0.3 CPU, 1GB RAM | services_net |
 | webapp | DVWA | 0.5 CPU, 1GB RAM | services_net |
 | database | MySQL 5.7 | 0.5 CPU, 1GB RAM | services_net |
+| portainer_agent | Portainer Agent | Minimal | bridge (172.17.0.0/16) |
 
-**Total: 9 containers** (6 workspaces + workstation + webapp + database)
+**Total: 10 containers** (6 workspaces + workstation + webapp + database + agent)
 
 ## Data Flow
 

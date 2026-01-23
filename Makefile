@@ -1,33 +1,33 @@
 # ============================================================================
 # VTCS Cyber Range - Makefile
 # ============================================================================
-# Convenience targets for lab management
+# Convenience targets for deployment
+# Container management: Portainer (https://10.200.0.1:9443)
+# Phase control: lab.sh on VDS host
 # ============================================================================
 
-.PHONY: help start stop restart status reset logs build ssh-info deploy-host deploy-labvm
+.PHONY: help prep combat phase deploy-host deploy-labvm
 
 # Default target
 help:
 	@echo "VTCS Cyber Range - Available Targets"
 	@echo "====================================="
 	@echo ""
-	@echo "Lab Management:"
-	@echo "  make start      - Start the lab environment"
-	@echo "  make stop       - Stop the lab environment"
-	@echo "  make restart    - Restart the lab environment"
-	@echo "  make status     - Show container status"
-	@echo "  make reset      - Reset to clean state (destroys data!)"
-	@echo "  make logs       - Show logs (use CONTAINER=name for specific)"
-	@echo "  make build      - Build container images"
-	@echo "  make ssh-info   - Show SSH connection info"
+	@echo "Phase Control (run on VDS as admin/instructor):"
+	@echo "  sudo /opt/cyberlab/scripts/lab.sh prep    - Preparation phase"
+	@echo "  sudo /opt/cyberlab/scripts/lab.sh combat  - Combat phase"
+	@echo "  sudo /opt/cyberlab/scripts/lab.sh phase   - Check current phase"
+	@echo ""
+	@echo "Container Management:"
+	@echo "  Portainer: https://10.200.0.1:9443"
+	@echo ""
+	@echo "VM Snapshots:"
+	@echo "  Cockpit: https://10.200.0.1:9090"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make deploy-host    - Deploy host setup scripts to VDS"
 	@echo "  make deploy-labvm   - Deploy lab VM scripts"
 	@echo ""
-	@echo "Variables:"
-	@echo "  SCENARIO=name   - Use specific scenario (default: base)"
-	@echo "  CONTAINER=name  - Target specific container"
 	@echo ""
 
 # Configuration
@@ -35,34 +35,18 @@ SCENARIO ?= base
 SCRIPTS_DIR := scripts
 SCENARIOS_DIR := scenarios
 
-# Lab management targets
-start:
-	@bash $(SCRIPTS_DIR)/lab.sh start -s $(SCENARIO)
+# Phase control targets (run on VDS as admin/instructor)
+prep:
+	@echo "Run on VDS: sudo /opt/cyberlab/scripts/lab.sh prep"
 
-stop:
-	@bash $(SCRIPTS_DIR)/lab.sh stop -s $(SCENARIO)
+combat:
+	@echo "Run on VDS: sudo /opt/cyberlab/scripts/lab.sh combat"
 
-restart:
-	@bash $(SCRIPTS_DIR)/lab.sh restart -s $(SCENARIO)
+phase:
+	@echo "Run on VDS: sudo /opt/cyberlab/scripts/lab.sh phase"
 
-status:
-	@bash $(SCRIPTS_DIR)/lab.sh status -s $(SCENARIO)
-
-reset:
-	@bash $(SCRIPTS_DIR)/lab.sh reset -s $(SCENARIO)
-
-logs:
-ifdef CONTAINER
-	@bash $(SCRIPTS_DIR)/lab.sh logs -s $(SCENARIO) -c $(CONTAINER) -f
-else
-	@bash $(SCRIPTS_DIR)/lab.sh logs -s $(SCENARIO)
-endif
-
-build:
-	@bash $(SCRIPTS_DIR)/lab.sh build -s $(SCENARIO)
-
-ssh-info:
-	@bash $(SCRIPTS_DIR)/lab.sh ssh-info -s $(SCENARIO)
+# Container management: Use Portainer (https://10.200.0.1:9443)
+# VM snapshots: Use Cockpit (https://10.200.0.1:9090)
 
 # Deployment targets (run from local machine)
 VDS_HOST ?= 62.171.146.215

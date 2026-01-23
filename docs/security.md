@@ -4,6 +4,27 @@
 
 The VTCS Cyber Range implements a defense-in-depth security model with multiple layers of protection to ensure that lab activities remain contained and do not impact external systems.
 
+### Security Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    VDS HOST (SECURE ZONE)                       │
+│  • All control scripts run here                                 │
+│  • Portainer UI (9443) - VPN only                              │
+│  • Cockpit (9090) - VPN only                                   │
+│  • lab.sh controls Lab VM via SSH                              │
+│  • iptables blocks Lab VM from VDS services                    │
+├─────────────────────────────────────────────────────────────────┤
+│                    LAB VM (EXPENDABLE ZONE)                     │
+│  • If compromised via container escape, cannot affect VDS      │
+│  • Cannot reach VDS ports 22 or 9443                           │
+│  • Portainer Agent (9001) - only VDS can reach                 │
+│  • All containers run here                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+> 🔒 **Key Principle**: VDS is the secure control plane. Lab VM is "expendable" - if compromised, restore from snapshot.
+
 ## Security Objectives
 
 1. **Containment**: All attack activities stay within the lab environment
@@ -21,14 +42,15 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 | WireGuard VPN | UDP/51820 | Internet | Pre-shared keys + peer auth |
 | SSH (Host) | TCP/22 | VPN only | Per-user SSH keys or password |
 | Cockpit | TCP/9090 | VPN only | Username/password |
+| Portainer | TCP/9443 | VPN only | Separate Portainer login |
 | SSH (Lab VM) | TCP/22 | VPN only | Per-user SSH keys + ForceCommand |
 
 ### User Roles
 
 | Role | Access Level | Capabilities |
 |------|--------------|--------------|
-| Admin | Full | Host SSH, Cockpit, Lab VM, all containers |
-| Instructor | Lab VM | Lab management, workspace monitoring |
+| Admin | Full | Host SSH, Cockpit, Portainer, Lab VM, all containers |
+| Instructor | VDS Limited | VDS SSH (lab.sh only), Cockpit, Portainer |
 | Red Team Student | Workspace | Own workspace + services_net targets |
 | Blue Team Student | Workspace | Own workspace + services_net monitoring |
 
@@ -53,29 +75,36 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 
 ## Firewall Rules
 
-### Host Firewall (nftables)
+### Host Firewall (nftables + iptables)
 
+**nftables** (`/etc/nftables.conf`):
 ```nft
-# Default policies
-chain input { policy drop; }
-chain forward { policy drop; }
-chain output { policy accept; }
-
-# Allowed inbound (from internet)
-- UDP 51820 (WireGuard) from any
-- ICMP from any
-
-# Allowed inbound (from VPN 10.200.0.0/24)
-- TCP 22 (SSH)
-- TCP 9090 (Cockpit)
-
-# Allowed inbound (from Lab VM 192.168.122.0/24)
-- All (trusted internal)
-
-# Forwarding
-- VPN ↔ Lab VM network (192.168.122.0/24)
-- Lab VM NAT for controlled egress
+chain input {
+    policy drop;
+    
+    # From internet
+    udp dport 51820 accept          # WireGuard
+    icmp accept
+    
+    # From VPN (wg0)
+    iif "wg0" tcp dport 22 accept   # SSH
+    iif "wg0" tcp dport 9090 accept # Cockpit
+    iif "wg0" tcp dport 9443 accept # Portainer
+    
+    # Block Lab VM from VDS services (defense in depth)
+    iif "virbr0" tcp dport { 22, 9443 } drop
+    iif "virbr0" accept              # Allow other Lab VM traffic
+}
 ```
+
+**iptables** (`/etc/iptables/rules.v4`) - Lab VM isolation:
+```bash
+# Block Lab VM (virbr0) from reaching VDS services
+-A INPUT -i virbr0 -p tcp --dport 22 -j DROP
+-A INPUT -i virbr0 -p tcp --dport 9443 -j DROP
+```
+
+> ⚠️ **Security**: Lab VM cannot reach VDS SSH (22) or Portainer (9443). If Lab VM is compromised, attackers cannot pivot to VDS control plane.
 
 ### Lab VM Firewall (nftables)
 
@@ -127,19 +156,30 @@ The lab supports two operational phases:
 
 ### Technical Implementation
 
-Phase control uses iptables rules on the Lab VM:
+Phase control runs on **VDS Host** and executes via SSH to Lab VM:
 
 ```bash
-# Preparation Phase (in lab.sh prep):
+# On VDS as admin or instructor:
+sudo /opt/cyberlab/scripts/lab.sh prep     # Enable preparation phase
+sudo /opt/cyberlab/scripts/lab.sh combat   # Enable combat phase
+sudo /opt/cyberlab/scripts/lab.sh phase    # Check current phase
+```
+
+The script uses SSH key `/root/.ssh/portainer_labvm` to execute iptables rules on Lab VM:
+
+```bash
+# Preparation Phase (executed on Lab VM via SSH):
 iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Enable NAT
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j DROP          # Block red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j DROP          # Block blue→red
 
-# Combat Phase (in lab.sh combat):
+# Combat Phase (executed on Lab VM via SSH):
 iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Disable NAT
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j ACCEPT        # Allow red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j ACCEPT        # Allow blue→red
 ```
+
+> 🔒 **Security**: Phase control runs on VDS, so even if Lab VM is compromised, attackers cannot modify the control scripts.
 
 ## Secrets Management
 
@@ -169,20 +209,27 @@ The following are excluded via `.gitignore`:
 
 ### Monitoring Architecture (Security Design)
 
-**Simple approach**: Use Cockpit's built-in monitoring instead of separate tools.
+**Approach**: Use Cockpit's built-in monitoring + Portainer for container management.
 
-**Why Cockpit instead of Grafana/Prometheus?**
-- No additional services to secure/patch
-- No privileged containers needed
+**Why Cockpit + Portainer?**
+- No additional monitoring services to secure/patch
+- Portainer runs on VDS (not exposed to Lab VM)
+- Agent-only connection (Lab VM cannot reach Portainer UI)
 - Already VPN-only by design
-- VM console access included
+- VM console access included in Cockpit
 - Sufficient for training environment
 
 **Cockpit provides:**
 - CPU, memory, disk, network metrics
-- VM management and console
+- VM management, snapshots, and console
 - Service status monitoring
 - Log viewing (journalctl)
+
+**Portainer provides:**
+- Container start/stop/restart
+- Container logs and exec
+- Network and volume inspection
+- Accessible to instructors without Lab VM SSH
 
 ### Host-Level Logging
 
@@ -233,11 +280,8 @@ Current approach: Logs on Lab VM + regular snapshots. Admins can investigate via
 ### Emergency Reset
 
 ```bash
-# Full environment reset (destroys all data)
-cd /opt/cyberlab
-./scripts/lab.sh reset
-
-# Or nuclear option - restore Lab VM snapshot
+# Reset containers via Portainer (https://10.200.0.1:9443)
+# Or restore Lab VM snapshot via Cockpit/virsh
 virsh snapshot-revert labvm clean-baseline
 ```
 

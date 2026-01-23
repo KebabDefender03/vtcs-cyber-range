@@ -52,10 +52,11 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture.
    # ... continue with runbook
    ```
 
-3. **Start Lab Environment** (on Lab VM)
+3. **Start Lab Environment** (via Portainer or on Lab VM)
    ```bash
-   cd /opt/cyberlab
-   ./scripts/lab.sh start
+   # Via Portainer: https://10.200.0.1:9443
+   # Or on Lab VM:
+   docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
    ```
 
 ## Repository Structure
@@ -74,9 +75,7 @@ VDS/
 ├── scenarios/
 │   └── base/                 # Default lab scenario
 │       ├── docker-compose.yml
-│       ├── .env.example
-│       ├── images/           # Container Dockerfiles
-│       └── init-db/          # Database initialization
+│       └── .env.example
 ├── scripts/
 │   └── lab.sh                # Lab management CLI
 ├── docs/
@@ -89,39 +88,23 @@ VDS/
 
 ## Lab Management
 
-```bash
-# Start the lab
-./scripts/lab.sh start
+### Container Management (via Portainer)
 
-# Check status
-./scripts/lab.sh status
+Container start/stop/logs/restart is done via Portainer: https://10.200.0.1:9443
 
-# View logs
-./scripts/lab.sh logs -c webapp -f
+### Phase Control (via lab.sh)
 
-# Open shell in workspace
-./scripts/lab.sh shell -c red1
-
-# Reset to clean state
-./scripts/lab.sh reset
-
-# Show SSH connection info
-./scripts/lab.sh ssh-info
-```
-
-## Phase Control
-
-The lab supports two phases for structured training sessions:
+Phase control runs on VDS Host (as admin or instructor):
 
 ```bash
 # Preparation phase: Internet ON, cross-team attacks OFF
-./scripts/lab.sh prep
+sudo /opt/cyberlab/scripts/lab.sh prep
 
 # Combat phase: Internet OFF, cross-team attacks ON  
-./scripts/lab.sh combat
+sudo /opt/cyberlab/scripts/lab.sh combat
 
 # Check current phase
-./scripts/lab.sh phase
+sudo /opt/cyberlab/scripts/lab.sh phase
 ```
 
 | Phase | Internet | Red ↔ Blue | Duration |
@@ -133,33 +116,35 @@ The lab supports two phases for structured training sessions:
 
 - **VPN-only access**: No services exposed to internet except WireGuard
 - **Phase-based control**: Internet and cross-team access controlled per phase
+- **VDS-based control**: All control scripts run on VDS (Lab VM is expendable)
 - **Per-user SSH keys**: Each user has unique keypair with ForceCommand
 - **Egress control**: Containers have no internet access by default
 - **Resource limits**: CPU/memory limits prevent resource exhaustion
-- **Firewall layers**: Host nftables + Lab VM nftables + Docker networks
+- **Firewall layers**: Host nftables + iptables + Lab VM firewall + Docker networks
 - **Logging**: VPN, SSH, container lifecycle events logged
+- **GUI Management**: Portainer (containers) + Cockpit (VM/snapshots) via VPN only
 
 See [docs/security.md](docs/security.md) for complete security documentation.
 
 ## Authentication
 
-Access is via SSH keys (password auth is disabled):
+Access is via SSH keys (password auth is disabled for admins):
 
 | Role | Access | Auth Method |
 |------|--------|-------------|
 | Admin | VDS host + Lab VM (full shell) | SSH key only |
-| Instructor | Lab VM (shell + docker) | SSH key only |
+| Instructor | VDS host (lab.sh only) + Portainer + Cockpit | Password |
 | Student | Lab VM → auto-exec into container | SSH key only |
 
 > 💡 **Admins**: Use `ssh labvm` from VDS to connect to Lab VM (SSH config auto-selects key).
+> 💡 **Instructors**: Use Portainer (https://10.200.0.1:9443) for container management.
 
 See [MASTER-DOCUMENTATION.md](MASTER-DOCUMENTATION.md) for full access matrix.
 
 ## Recovery Options
 
-1. **Container restart**: `docker restart <container>`
-2. **Full lab reset**: `./scripts/lab.sh reset`
-3. **VM snapshot restore**: `virsh snapshot-revert labvm clean-baseline`
+1. **Container restart**: Via Portainer (https://10.200.0.1:9443)
+2. **Full lab reset**: Restore snapshot via Cockpit or `virsh snapshot-revert labvm clean-baseline`
 
 ## Documentation
 

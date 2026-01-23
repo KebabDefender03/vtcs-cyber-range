@@ -22,6 +22,10 @@
                      │   │ Port 9090 (VPN)   │   │
                      │   └───────────────────┘   │
                      │   ┌───────────────────┐   │
+                     │   │ Portainer CE      │   │
+                     │   │ Port 9443 (VPN)   │   │
+                     │   └───────────────────┘   │
+                     │   ┌───────────────────┐   │
                      │   │ nftables Firewall │   │
                      │   └───────────────────┘   │
                      │   ┌───────────────────┐   │
@@ -32,6 +36,7 @@
                      ┌─────────────▼─────────────┐
                      │   Lab VM (192.168.122.10) │
                      │   Ubuntu + Docker         │
+                     │   Portainer Agent (:9001) │
                      │                           │
                      │  ┌────────────────────────────────────────────┐
                      │  │           SEGMENTED DOCKER NETWORKS        │
@@ -66,6 +71,36 @@
                      │  └────────────────────────────────────────────┘
                      └───────────────────────────────────────────┘
 ```
+
+## Security Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        VDS HOST (SECURE ZONE)                          │
+│   • All control scripts (/opt/cyberlab/scripts/lab.sh)                │
+│   • Portainer UI (9443) - Web management console                      │
+│   • Cockpit (9090) - System administration GUI                        │
+│   • WireGuard VPN server                                              │
+│   • nftables + iptables firewall rules                                │
+│   • Admin/Instructor accounts with limited sudo                       │
+├────────────────────────────────────────────────────────────────────────┤
+│                          FIREWALL BOUNDARY                             │
+│   • Lab VM blocked from VDS port 22 (SSH)                             │
+│   • Lab VM blocked from VDS port 9443 (Portainer)                     │
+│   • Only VDS can SSH to Lab VM (/root/.ssh/portainer_labvm key)       │
+├────────────────────────────────────────────────────────────────────────┤
+│                      LAB VM (EXPENDABLE ZONE)                          │
+│   • Docker containers (all 10 lab containers)                         │
+│   • Portainer Agent only (port 9001)                                  │
+│   • No control scripts - receives commands via SSH from VDS           │
+│   • Can be wiped/rebuilt without affecting VDS                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Security Principle**: VDS is the secure control plane. Lab VM is expendable.
+- If a container is compromised, it cannot reach VDS management services
+- All administrative actions go through VDS (never direct to Lab VM for instructors)
+- Phase control runs via: `VDS lab.sh` → SSH → `Lab VM /opt/cyberlab/scripts/phase_control.sh`
 
 ## Network Segmentation
 
@@ -113,7 +148,7 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | Role | VDS Host | Lab VM | Docker | Targets |
 |------|----------|--------|--------|---------|
 | Admin (1-3) | Full sudo | Full sudo | Full control | All |
-| Instructor (1-2) | ❌ | Shell + docker | Inspect/restart | Monitor |
+| Instructor (1-2) | SSH + lab.sh + Cockpit + Portainer | Via VDS | Via Portainer | Monitor |
 | Red Team (1-3) | ❌ | Container only | Own container | webapp, db |
 | Blue Team (1-3) | ❌ | Container only | Own container | Monitor traffic |
 
@@ -122,22 +157,23 @@ Internet: ✅ ON                           Internet: ❌ OFF
 ### VDS Host Users
 | Username | Purpose | SSH Key | Sudo |
 |----------|---------|---------|------|
-| admin1 | Primary admin | host_admin1.key | Yes |
-| admin2 | Backup admin | host_admin2.key | Yes |
-| admin3 | Backup admin | host_admin3.key | Yes |
-| root | Emergency only | Contabo key | Yes |
+| admin1 | Primary admin | host_admin1.key | Full |
+| admin2 | Backup admin | host_admin2.key | Full |
+| admin3 | Backup admin | host_admin3.key | Full |
+| instructor1 | Lab instructor | (password) | lab.sh only |
+| instructor2 | Lab instructor | (password) | lab.sh only |
+| root | Emergency only | Contabo key | Full |
 
 ### Lab VM Users
 
 > 💡 **Admins can use `ssh labvm` from VDS** - SSH config auto-selects key and username.
+> ⚠️ **Instructors access Lab VM via Portainer on VDS** - no direct Lab VM SSH access.
 
 | Username | Purpose | SSH Key | ForceCommand |
 |----------|---------|---------|--------------|
 | labadmin1 | Admin | labvm_admin1.key | No (full shell) |
 | labadmin2 | Admin | labvm_admin2.key | No (full shell) |
 | labadmin3 | Admin | labvm_admin3.key | No (full shell) |
-| instructor1 | Instructor | labvm_instructor1.key | No (shell + docker) |
-| instructor2 | Instructor | labvm_instructor2.key | No (shell + docker) |
 | red1 | Red Team Student | labvm_red1.key | docker exec -it red1 /bin/bash |
 | red2 | Red Team Student | labvm_red2.key | docker exec -it red2 /bin/bash |
 | red3 | Red Team Student | labvm_red3.key | docker exec -it red3 /bin/bash |
@@ -190,13 +226,15 @@ Internet: ✅ ON                           Internet: ❌ OFF
 ### Currently Available
 | Interface | URL | Purpose | Security Impact |
 |-----------|-----|---------|-----------------|
-| **Cockpit** | https://10.200.0.1:9090 | VDS host management, VM console | Low - VPN required |
+| **Cockpit** | https://10.200.0.1:9090 | VDS host management, VM console, snapshots | Low - VPN required |
+| **Portainer** | https://10.200.0.1:9443 | Docker container management via agent | Low - VPN required, agent-only |
+
+> 💡 **Portainer runs on VDS** and connects to Lab VM via agent on port 9001. Lab VM cannot reach Portainer UI.
 
 ### Optional GUIs (Not Deployed)
 
 | Option | Purpose | Security Risk | Recommendation |
 |--------|---------|---------------|----------------|
-| **Portainer** | Docker management GUI | Medium - API access to all containers | Only if needed for instructors |
 | **VNC to Lab VM** | Desktop access to Lab VM | High - additional attack surface | Avoid unless essential |
 | **noVNC** | Browser-based VNC | High - web service exposure | Not recommended |
 
@@ -214,15 +252,16 @@ Each GUI adds:
 ### For Each Admin (1, 2 & 3):
 - [ ] VPN config (in user-packages/admin{N}/ folder)
 - [ ] Host SSH key (host_admin{N}.key)
-- [ ] Lab VM SSH key (labvm_admin{N}.key)
 - [ ] README with credentials and instructions
 
-> **Note**: Admin credentials are in the user-packages READMEs (not stored in this repo for security).
+> **Note**: Admin Lab VM keys are stored on VDS in `~/.ssh/` - use `ssh labvm` from VDS.
 
 ### For Each Instructor:
 - [ ] VPN config (instructor1.conf or instructor2.conf)
-- [ ] Lab VM SSH key (labvm_instructor1.key or labvm_instructor2.key)
+- [ ] Host SSH key (host_instructor{N}.key)
 - [ ] README with instructions
+
+> **Note**: Instructors access Lab VM via Portainer/Cockpit, not SSH.
 
 ### For Each Student:
 - [ ] VPN config (student-red1.conf, etc.)
@@ -277,37 +316,50 @@ Each GUI adds:
 
 ### VDS Host:
 - WireGuard config: `/etc/wireguard/wg0.conf`
-- Firewall rules: `/etc/nftables.conf`
-- SSH keys: `/root/.ssh/`
+- Firewall rules: `/etc/nftables.conf` + `/etc/iptables/rules.v4`
+- Lab control script: `/opt/cyberlab/scripts/lab.sh`
+- Lab VM SSH key: `/root/.ssh/portainer_labvm`
+- VPN client configs: `/opt/cyberlab/vpn-configs/`
+- Instructor sudoers: `/etc/sudoers.d/instructors`
 - VM images: `/var/lib/libvirt/images/`
+- Portainer data: `/var/lib/docker/volumes/portainer_data/`
 
 ### Lab VM:
-- Docker compose: `/home/labadmin/docker-compose.yml`
+- Docker compose: `/opt/cyberlab/scenarios/base/docker-compose.yml`
 - Container data: `/home/labadmin/kali-data/`
 - User SSH keys: `/home/*/.ssh/authorized_keys`
+- Portainer agent: Running on port 9001
 
 ## Quick Reference Commands
 
 ### VDS Host (as admin):
 ```bash
-# Check VPN status
-wg show
+# Phase control
+sudo /opt/cyberlab/scripts/lab.sh prep      # Internet ON, cross-team OFF
+sudo /opt/cyberlab/scripts/lab.sh combat    # Internet OFF, cross-team ON
+sudo /opt/cyberlab/scripts/lab.sh phase     # Check current phase
 
-# List VPN peers
-wg show wg0 peers
+# Container management: Use Portainer (https://10.200.0.1:9443)
+
+# Check VPN status
+sudo wg show
 
 # Check firewall
-nft list ruleset
+sudo nft list ruleset
+sudo iptables -L -n
 
-# VM status
+# VM management
 virsh list --all
-
-# Start/stop Lab VM
 virsh start labvm
 virsh shutdown labvm
+virsh snapshot-list labvm
 ```
 
-### Lab VM (as labadmin):
+### Web Interfaces (VPN required):
+- **Cockpit**: https://10.200.0.1:9090 (VM management, snapshots)
+- **Portainer**: https://10.200.0.1:9443 (container management)
+
+### Lab VM (as labadmin via `ssh labvm`):
 ```bash
 # Container status
 docker ps -a
@@ -316,7 +368,7 @@ docker ps -a
 docker logs -f red1
 
 # Restart all containers
-docker-compose restart
+cd /opt/cyberlab/scenarios/base && docker compose restart
 
 # Resource usage
 docker stats

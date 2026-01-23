@@ -2,9 +2,9 @@
 # VTCS Cyber Range POC - Base Scenario Docker Compose
 # ============================================================================
 # This compose file creates the complete lab environment:
-# - 3 Blue team workspaces (Blue1, Blue2, Blue3)
-# - 3 Red team workspaces (Red1, Red2, Red3)
-# - Target services (web server, database)
+# - 3 Blue team workspaces (Blue1, Blue2, Blue3) - Kali Linux
+# - 3 Red team workspaces (Red1, Red2, Red3) - Kali Linux
+# - Target services (DVWA, database, workstation)
 # - Isolated networks with controlled connectivity
 #
 # Resource limits are set to allow 6 concurrent users on 3 CPU cores
@@ -12,144 +12,120 @@
 
 services:
   # ==========================================================================
-  # BLUE TEAM WORKSPACES
+  # BLUE TEAM WORKSPACES (Kali Linux)
   # ==========================================================================
   blue1:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: blue1
     hostname: blue1
+    command: tail -f /dev/null
     networks:
       - blue_net
       - services_net  # Blue team can access services
-    environment:
-      - WORKSPACE_NAME=Blue1
-      - TEAM=blue
     volumes:
-      - blue1_home:/home/student
+      - blue1_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
     restart: unless-stopped
 
   blue2:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: blue2
     hostname: blue2
+    command: tail -f /dev/null
     networks:
       - blue_net
       - services_net
-    environment:
-      - WORKSPACE_NAME=Blue2
-      - TEAM=blue
     volumes:
-      - blue2_home:/home/student
+      - blue2_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
     restart: unless-stopped
 
   blue3:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: blue3
     hostname: blue3
+    command: tail -f /dev/null
     networks:
       - blue_net
       - services_net
-    environment:
-      - WORKSPACE_NAME=Blue3
-      - TEAM=blue
     volumes:
-      - blue3_home:/home/student
+      - blue3_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
     restart: unless-stopped
 
   # ==========================================================================
-  # RED TEAM WORKSPACES
+  # RED TEAM WORKSPACES (Kali Linux)
   # ==========================================================================
   red1:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: red1
     hostname: red1
+    command: tail -f /dev/null
     networks:
       - red_net
       - services_net  # Red team can access services (attack targets)
-    environment:
-      - WORKSPACE_NAME=Red1
-      - TEAM=red
     volumes:
-      - red1_home:/home/student
+      - red1_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
     restart: unless-stopped
 
   red2:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: red2
     hostname: red2
+    command: tail -f /dev/null
     networks:
       - red_net
       - services_net
-    environment:
-      - WORKSPACE_NAME=Red2
-      - TEAM=red
     volumes:
-      - red2_home:/home/student
+      - red2_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
     restart: unless-stopped
 
   red3:
-    build:
-      context: ./images/workspace
-      dockerfile: Dockerfile
+    image: kalilinux/kali-rolling
     container_name: red3
     hostname: red3
+    command: tail -f /dev/null
     networks:
       - red_net
       - services_net
-    environment:
-      - WORKSPACE_NAME=Red3
-      - TEAM=red
     volumes:
-      - red3_home:/home/student
+      - red3_home:/root
     deploy:
       resources:
         limits:
-          cpus: '0.4'
+          cpus: '0.5'
           memory: 2G
         reservations:
           memory: 512M
@@ -159,71 +135,46 @@ services:
   # TARGET SERVICES
   # ==========================================================================
   
-  # Vulnerable web application (target for red team, monitored by blue team)
+  # DVWA - Damn Vulnerable Web Application (target for red team)
   webapp:
-    build:
-      context: ./images/webapp
-      dockerfile: Dockerfile
+    image: vulnerables/web-dvwa
     container_name: webapp
     hostname: webapp
     networks:
       - services_net
     environment:
-      - DB_HOST=database
-      - DB_NAME=${DB_NAME:-labdb}
-      - DB_USER=${DB_USER:-labuser}
-      - DB_PASS=${DB_PASS:-labpass123}
+      - DB_SERVER=database
     ports:
-      - "127.0.0.1:8080:80"  # Only accessible from Lab VM localhost
+      - "0.0.0.0:8080:80"
     depends_on:
       - database
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 1G
     restart: unless-stopped
 
-  # Database service
+  # Database service for DVWA
   database:
-    image: mysql:8.0
+    image: mysql:5.7
     container_name: database
     hostname: database
     networks:
       - services_net
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-rootpass123}
-      - MYSQL_DATABASE=${DB_NAME:-labdb}
-      - MYSQL_USER=${DB_USER:-labuser}
-      - MYSQL_PASSWORD=${DB_PASS:-labpass123}
+      - MYSQL_ROOT_PASSWORD=dvwa
+      - MYSQL_DATABASE=dvwa
+      - MYSQL_USER=dvwa
+      - MYSQL_PASSWORD=p@ssw0rd
     volumes:
       - db_data:/var/lib/mysql
-      - ./init-db:/docker-entrypoint-initdb.d:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 2G
     restart: unless-stopped
-
-  # ==========================================================================
-  # MONITORING (Optional - for blue team visibility)
-  # ==========================================================================
   
-  # Simple log aggregator (optional, can be removed to save resources)
-  # logserver:
-  #   image: grafana/loki:2.9.0
-  #   container_name: logserver
-  #   networks:
-  #     - blue_net
-  #   volumes:
-  #     - loki_data:/loki
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '0.2'
-  #         memory: 512M
-  #   restart: unless-stopped
+  # Workstation (additional target)
+  workstation:
+    image: ubuntu:22.04
+    container_name: workstation
+    hostname: workstation
+    command: tail -f /dev/null
+    networks:
+      - services_net
+    restart: unless-stopped
 
 # ============================================================================
 # NETWORKS
@@ -281,4 +232,3 @@ volumes:
   
   # Service data
   db_data:
-  # loki_data:
