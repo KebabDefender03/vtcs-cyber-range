@@ -74,12 +74,12 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 
 | Network | Subnet | Gateway | Containers |
 |---------|--------|---------|------------|
-| blue_net | 172.20.1.0/24 | 172.20.1.1 | blue1 (.11), blue2 (.12), blue3 (.13) |
-| red_net | 172.20.2.0/24 | 172.20.2.1 | red1 (.11), red2 (.12), red3 (.13) |
-| services_net | 172.20.3.0/24 | 172.20.3.1 | database (.20), webapp (.30), workstation (.50) |
-| bridge | 172.17.0.0/16 | 172.17.0.1 | portainer_agent (.2) |
+| blue_net | 172.20.1.0/24 | 172.20.1.1 | blue1, blue2, blue3 |
+| red_net | 172.20.2.0/24 | 172.20.2.1 | red1, red2, red3 |
+| services_net | 172.20.3.0/24 | 172.20.3.1 | webapp, database, workstation |
+| bridge | 172.17.0.0/16 | 172.17.0.1 | portainer_agent |
 
-> 💡 Networks are named `blue_net`, `red_net`, `services_net` (no prefix). Team containers also connect to services_net for target access.
+> 💡 Container IPs are assigned dynamically by Docker. Use container names for communication (e.g., `ping webapp`).
 
 ### Phase-Based Traffic Control
 
