@@ -429,16 +429,19 @@ nft list ruleset | grep 9090
 | Cockpit | admin/instructor | Same as VDS password |
 | Portainer | admin/instructor | Separate Portainer account |
 | Lab VM | labadmin1/2/3 | `ssh labvm` from VDS (auto-uses key) |
-| Lab VM | red1/2/3, blue1/2/3 | SSH key + ForceCommand |
+| VDS | red1/2/3, blue1/2/3 | SSH key to VDS, ForceCommand to container |
 | DVWA | admin | password (default DVWA login) |
 
 ### Important Files
 
 | File | Location | Purpose |
-|------|----------|---------|
+|------|----------|----------|
 | WireGuard config | `/etc/wireguard/wg0.conf` | VPN server |
 | Firewall rules (VDS) | `/etc/nftables.conf` + iptables | Host firewall |
 | Lab script (VDS) | `/opt/cyberlab/scripts/lab.sh` | Phase control CLI |
 | Portainer SSH key | `/root/.ssh/portainer_labvm` | Lab VM control |
-| Docker compose | `/opt/cyberlab/scenarios/base/docker-compose.yml` | Lab definition |
+| Shared labvm key | `/etc/cyberlab/keys/labvm_key` | ForceCommand SSH to Lab VM |
+| Global SSH config | `/etc/ssh/ssh_config.d/labvm.conf` | labvm alias for all users |
 | Portainer agent | Lab VM Docker | Container management |
+
+> **Note**: Docker Compose is deployed via Portainer from GitHub (KebabDefender03/vtcs-cyber-range), not stored locally on Lab VM.

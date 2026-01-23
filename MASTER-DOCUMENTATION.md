@@ -148,9 +148,9 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | Role | VDS Host | Lab VM | Docker | Targets |
 |------|----------|--------|--------|---------|
 | Admin (1-3) | Full sudo | Full sudo | Full control | All |
-| Instructor (1-2) | SSH + lab.sh + Cockpit + Portainer | Via VDS | Via Portainer | Monitor |
-| Red Team (1-3) | ❌ | Container only | Own container | webapp, db |
-| Blue Team (1-3) | ❌ | Container only | Own container | Monitor traffic |
+| Instructor (1-2) | SSH + lab.sh + Cockpit + Portainer | SSH via VDS | Via Portainer | Monitor |
+| Red Team (1-3) | SSH (ForceCommand) | Via ForceCommand | Own container only | webapp, db |
+| Blue Team (1-3) | SSH (ForceCommand) | Via ForceCommand | Own container only | Monitor traffic |
 
 ## User Accounts
 
@@ -162,24 +162,30 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | admin3 | Backup admin | host_admin3.key | Full |
 | instructor1 | Lab instructor | (password) | lab.sh only |
 | instructor2 | Lab instructor | (password) | lab.sh only |
+| red1 | Red Team Student | red1.key | None (ForceCommand) |
+| red2 | Red Team Student | red2.key | None (ForceCommand) |
+| red3 | Red Team Student | red3.key | None (ForceCommand) |
+| blue1 | Blue Team Student | blue1.key | None (ForceCommand) |
+| blue2 | Blue Team Student | blue2.key | None (ForceCommand) |
+| blue3 | Blue Team Student | blue3.key | None (ForceCommand) |
 | root | Emergency only | Contabo key | Full |
+
+> **Student Access Flow**: Students SSH to VDS → ForceCommand executes `ssh labvm docker exec -it <container> bash` → Student lands directly in their Kali container.
 
 ### Lab VM Users
 
 > 💡 **Admins can use `ssh labvm` from VDS** - SSH config auto-selects key and username.
-> ⚠️ **Instructors access Lab VM via Portainer on VDS** - no direct Lab VM SSH access.
+> ⚠️ **Students SSH to VDS** - ForceCommand automatically connects them to their container.
 
-| Username | Purpose | SSH Key | ForceCommand |
-|----------|---------|---------|--------------|
-| labadmin1 | Admin | labvm_admin1.key | No (full shell) |
-| labadmin2 | Admin | labvm_admin2.key | No (full shell) |
-| labadmin3 | Admin | labvm_admin3.key | No (full shell) |
-| red1 | Red Team Student | labvm_red1.key | docker exec -it red1 /bin/bash |
-| red2 | Red Team Student | labvm_red2.key | docker exec -it red2 /bin/bash |
-| red3 | Red Team Student | labvm_red3.key | docker exec -it red3 /bin/bash |
-| blue1 | Blue Team Student | labvm_blue1.key | docker exec -it blue1 /bin/bash |
-| blue2 | Blue Team Student | labvm_blue2.key | docker exec -it blue2 /bin/bash |
-| blue3 | Blue Team Student | labvm_blue3.key | docker exec -it blue3 /bin/bash |
+| Username | Purpose | SSH Key | Notes |
+|----------|---------|---------|-------|
+| labadmin1 | Admin | Via VDS ~/.ssh/ | Full shell access |
+| labadmin2 | Admin | Via VDS ~/.ssh/ | Full shell access |
+| labadmin3 | Admin | Via VDS ~/.ssh/ | Full shell access |
+| instructor1 | Instructor | Via VDS ~/.ssh/ | Full shell access |
+| instructor2 | Instructor | Via VDS ~/.ssh/ | Full shell access |
+
+> **Note**: Student users (red1-3, blue1-3) no longer exist on Lab VM. Students SSH to VDS where ForceCommand runs `ssh labvm docker exec -it <container> bash`.
 
 ## VPN Assignments
 
@@ -265,8 +271,10 @@ Each GUI adds:
 
 ### For Each Student:
 - [ ] VPN config (student-red1.conf, etc.)
-- [ ] Lab VM SSH key (labvm_red1.key, etc.)
+- [ ] VDS SSH key (red1.key, etc.) - connects to VDS, ForceCommand handles container access
 - [ ] README with rules and instructions
+
+> **Note**: Students SSH to VDS (10.200.0.1). ForceCommand automatically executes `ssh labvm docker exec -it <container> bash`.
 
 ## Emergency Procedures
 
@@ -318,17 +326,20 @@ Each GUI adds:
 - WireGuard config: `/etc/wireguard/wg0.conf`
 - Firewall rules: `/etc/nftables.conf` + `/etc/iptables/rules.v4`
 - Lab control script: `/opt/cyberlab/scripts/lab.sh`
-- Lab VM SSH key: `/root/.ssh/portainer_labvm`
+- Lab VM SSH key (root): `/root/.ssh/portainer_labvm`
+- Shared Lab VM key: `/etc/cyberlab/keys/labvm_key` (for ForceCommand)
+- Global SSH config: `/etc/ssh/ssh_config.d/labvm.conf` (labvm alias)
 - VPN client configs: `/opt/cyberlab/vpn-configs/`
 - Instructor sudoers: `/etc/sudoers.d/instructors`
 - VM images: `/var/lib/libvirt/images/`
 - Portainer data: `/var/lib/docker/volumes/portainer_data/`
 
 ### Lab VM:
-- Docker compose: `/opt/cyberlab/scenarios/base/docker-compose.yml`
-- Container data: `/home/labadmin/kali-data/`
-- User SSH keys: `/home/*/.ssh/authorized_keys`
-- Portainer agent: Running on port 9001
+- Portainer agent: Running on port 9001 (container management)
+- Docker containers: Deployed via Portainer from GitHub
+- User SSH keys: `/home/{labadmin1,labadmin2,labadmin3,instructor1,instructor2}/.ssh/authorized_keys`
+
+> **Note**: Docker Compose files are no longer stored locally. Portainer deploys the "vtcs" stack directly from GitHub repository.
 
 ## Quick Reference Commands
 
