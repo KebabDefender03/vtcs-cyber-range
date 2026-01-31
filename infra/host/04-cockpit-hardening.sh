@@ -23,16 +23,41 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Create admin user for Cockpit (don't use root)
-echo "[1/4] Creating admin user for Cockpit..."
-if ! id "labadmin" &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo,libvirt labadmin
-    echo "labadmin:ChangeMeOnFirstLogin!" | chpasswd
-    echo "  Created user 'labadmin' with temporary password"
-    echo "  CHANGE THIS PASSWORD IMMEDIATELY after first login!"
-else
-    echo "  User 'labadmin' already exists"
-fi
+# Create admin users for Cockpit (don't use root)
+echo "[1/4] Creating admin and instructor users for Cockpit..."
+
+# Admin users (full sudo access)
+for i in 1 2 3; do
+    username="admin${i}"
+    if ! id "${username}" &>/dev/null; then
+        useradd -m -s /bin/bash -G sudo,libvirt "${username}"
+        # Generate random password (user must change via package)
+        echo "  Created user '${username}' (password in user-package)"
+    else
+        echo "  User '${username}' already exists"
+    fi
+done
+
+# Instructor users (limited sudo for lab.sh only)
+for i in 1 2; do
+    username="instructor${i}"
+    if ! id "${username}" &>/dev/null; then
+        useradd -m -s /bin/bash "${username}"
+        # Add to libvirt group for Cockpit VM management view
+        usermod -aG libvirt "${username}"
+        echo "  Created user '${username}' (password in user-package)"
+    else
+        echo "  User '${username}' already exists"
+    fi
+done
+
+# Configure sudoers for instructors (only allow lab.sh)
+cat > /etc/sudoers.d/instructors << 'EOF'
+# Instructors can only run lab.sh for phase control
+instructor1 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh
+instructor2 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh
+EOF
+chmod 440 /etc/sudoers.d/instructors
 
 # Configure Cockpit to listen only on VPN interface
 echo "[2/4] Configuring Cockpit listen address..."
@@ -78,10 +103,11 @@ echo "=========================================="
 echo ""
 echo "Access Cockpit at: https://10.200.0.1:9090 (via VPN)"
 echo ""
-echo "Login credentials:"
-echo "  Username: labadmin"
-echo "  Password: ChangeMeOnFirstLogin!"
+echo "Authorized users:"
+echo "  - admin1, admin2, admin3 (full access)"
+echo "  - instructor1, instructor2 (VM viewing, lab.sh only)"
 echo ""
-echo "IMPORTANT: Change the password on first login!"
-echo "  Run: passwd labadmin"
+echo "Passwords must be set via user-packages or manually:"
+echo "  passwd admin1"
+echo "  passwd instructor1"
 echo ""

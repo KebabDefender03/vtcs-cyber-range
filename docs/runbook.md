@@ -110,7 +110,7 @@ ssh root@10.200.0.1  # Should work
 ./04-cockpit-hardening.sh
 ```
 
-**Expected output**: Cockpit hardened, labadmin user created.
+**Expected output**: Cockpit hardened, admin1-3 and instructor1-2 users created.
 
 **Test**: Access https://10.200.0.1:9090 via browser (with VPN active)
 
@@ -134,8 +134,8 @@ Access VM console via Cockpit (https://10.200.0.1:9090):
 2. Click "Console" tab
 3. Complete Ubuntu Server installation:
    - Hostname: `labvm`
-   - Username: `labadmin`
-   - Password: (your choice)
+   - Username: `labadmin1` (bootstrap script creates additional users)
+   - Password: (your choice, will be replaced by SSH keys)
    - Install OpenSSH Server: Yes
    - No additional snaps needed
 
@@ -153,14 +153,15 @@ virsh domifaddr labvm
 
 ```bash
 # From VDS
-scp /root/cyberlab-setup/infra/labvm/01-labvm-bootstrap.sh labadmin@192.168.122.X:~/
+scp /root/cyberlab-setup/infra/labvm/01-labvm-bootstrap.sh labadmin1@192.168.122.X:~/
 
 # SSH to Lab VM and run bootstrap
-ssh labadmin@192.168.122.X
+ssh labadmin1@192.168.122.X
 sudo bash ~/01-labvm-bootstrap.sh
 ```
 
 **Expected output**: Docker installed, firewall configured, directory structure created.
+Users created: labadmin1-3 (docker group), instructor1-2 (docker group).
 
 ---
 
@@ -175,7 +176,7 @@ scp -r scenarios scripts Makefile root@10.200.0.1:/tmp/cyberlab/
 
 # Then from VDS to Lab VM
 ssh root@10.200.0.1
-scp -r /tmp/cyberlab/* labadmin@192.168.122.X:/opt/cyberlab/
+scp -r /tmp/cyberlab/* labadmin1@192.168.122.X:/opt/cyberlab/
 ```
 
 ### Step 3.2: Start Lab Environment
@@ -311,10 +312,36 @@ sudo /opt/cyberlab/scripts/lab.sh phase
 **Typical session workflow:**
 1. Start containers via Portainer (https://10.200.0.1:9443)
 2. `sudo /opt/cyberlab/scripts/lab.sh prep` - Enable preparation phase (~30 min)
-3. Students download tools, set up their environments
-4. `sudo /opt/cyberlab/scripts/lab.sh combat` - Enable combat phase (rest of session)
-5. Red vs Blue battle begins!
-6. Stop containers via Portainer or restore snapshot via Cockpit
+3. **Blue team** (optional):
+   - Can capture network traffic via tcpdump from their blue container
+   - Can deploy their own SIEM to analyze traffic (see [Blue Team SIEM Guide](blue-team-siem-guide.md))
+   - Can SSH to workstation container if instructor enables it for log analysis
+4. **Red team** downloads attack tools and prepares exploits
+5. `sudo /opt/cyberlab/scripts/lab.sh combat` - Enable combat phase (rest of session)
+6. Red vs Blue battle begins!
+7. Stop containers via Portainer or restore snapshot via Cockpit
+
+### Blue Team Monitoring (Optional)
+
+During **Preparation Phase**, the blue team can:
+
+1. **Capture network traffic** (always available):
+   ```bash
+   tcpdump -i eth0 -w /tmp/capture.pcap host webapp
+   ```
+
+2. **Deploy optional SIEM** (if desired):
+   - Choose from Grafana+Loki, ELK, Wazuh, or manual analysis
+   - Deploy in their blue container or services_net
+   - Analyze captured traffic and workstation activity patterns
+   - See [Blue Team SIEM Guide](blue-team-siem-guide.md) for options
+
+3. **Analyze workstation activity**:
+   - Workstation generates traffic every 10-30 seconds
+   - Baseline: 2-5 HTTP requests/minute
+   - Spike: >150 requests/minute = likely attack
+
+See [Blue Team SIEM Guide](blue-team-siem-guide.md) for detailed SIEM deployment options.
 
 ### End Lab Session
 

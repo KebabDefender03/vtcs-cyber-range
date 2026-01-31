@@ -58,11 +58,33 @@ echo \
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Add labadmin to docker group
-usermod -aG docker labadmin 2>/dev/null || true
+# Add lab admin users to docker group
+echo "[4/6] Configuring Docker daemon and users..."
 
-# Configure Docker daemon
-echo "[4/6] Configuring Docker daemon..."
+# Create lab admin users on Lab VM (matching VDS users)
+for i in 1 2 3; do
+    username="labadmin${i}"
+    if ! id "${username}" &>/dev/null; then
+        useradd -m -s /bin/bash "${username}"
+        usermod -aG docker "${username}"
+        echo "  Created user '${username}'"
+    else
+        usermod -aG docker "${username}" 2>/dev/null || true
+    fi
+done
+
+# Instructor users on Lab VM
+for i in 1 2; do
+    username="instructor${i}"
+    if ! id "${username}" &>/dev/null; then
+        useradd -m -s /bin/bash "${username}"
+        usermod -aG docker "${username}"
+        echo "  Created user '${username}'"
+    else
+        usermod -aG docker "${username}" 2>/dev/null || true
+    fi
+done
+
 mkdir -p /etc/docker
 cat > /etc/docker/daemon.json << 'EOF'
 {
@@ -147,7 +169,10 @@ systemctl restart nftables
 # Create lab directory structure
 echo "[6/6] Creating lab directory structure..."
 mkdir -p /opt/cyberlab/{scenarios,scripts,data,logs}
-chown -R labadmin:labadmin /opt/cyberlab
+
+# Set ownership for all lab admin users
+chown -R root:docker /opt/cyberlab
+chmod -R 775 /opt/cyberlab
 
 # Clone or copy scenarios (placeholder)
 cat > /opt/cyberlab/README.md << 'EOF'
@@ -175,7 +200,7 @@ docker compose down -v    # Stop and reset volumes
 - services_net: 172.20.3.0/24 (Target services)
 EOF
 
-chown labadmin:labadmin /opt/cyberlab/README.md
+chmod 644 /opt/cyberlab/README.md
 
 echo ""
 echo "=========================================="

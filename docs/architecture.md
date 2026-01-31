@@ -169,16 +169,28 @@ Monitoring is provided via **Cockpit** - a simple, built-in web console that req
 
 ### Container Layer
 
-| Container | Base Image | Resources | Networks |
-|-----------|------------|-----------|----------|
-| blue1-3 | Kali Linux | 0.5 CPU, 2GB RAM | blue_net, services_net |
-| red1-3 | Kali Linux | 0.5 CPU, 2GB RAM | red_net, services_net |
-| workstation | Ubuntu 22.04 | 0.3 CPU, 1GB RAM | services_net |
-| webapp | DVWA | 0.5 CPU, 1GB RAM | services_net |
-| database | MySQL 5.7 | 0.5 CPU, 1GB RAM | services_net |
-| portainer_agent | Portainer Agent | Minimal | bridge (172.17.0.0/16) |
+| Container | Base Image | Resources | Networks | Notes |
+|-----------|------------|-----------|----------|-------|
+| blue1-3 | Kali Linux | 0.5 CPU, 2GB RAM | blue_net only | Services access via L3 routing |
+| red1-3 | Kali Linux | 0.5 CPU, 2GB RAM | red_net only | Services access via L3 routing |
+| workstation | Ubuntu 22.04 | 0.3 CPU, 1GB RAM | services_net | Generates realistic background activity |
+| webapp | DVWA | 0.5 CPU, 1GB RAM | services_net | Vulnerable application |
+| database | MySQL 5.7 | 0.5 CPU, 1GB RAM | services_net | Backend database |
+| portainer_agent | Portainer Agent | Minimal | bridge (172.17.0.0/16) | Remote management |
 
 **Total: 10 containers** (6 workspaces + workstation + webapp + database + agent)
+
+> 🔒 **Security Note**: Student containers (blue1-3, red1-3) are **NOT** on services_net.
+> This prevents Layer 2 cross-team communication. Access to services (webapp, database, workstation)
+> is controlled via iptables routing rules in lab.sh, allowing L3 filtering between teams even in prep mode.
+
+**Workstation Activity**: The workstation container runs continuous background activity that:
+- Every 10-30 seconds performs one random action
+- Generates HTTP traffic to webapp (normal browsing, logins, vulnerable page access)
+- Executes database queries
+- Creates realistic application logs
+
+This traffic is visible to blue team via network packet capture (tcpdump) from their blue containers.
 
 ## Data Flow
 

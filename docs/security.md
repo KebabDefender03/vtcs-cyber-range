@@ -75,7 +75,7 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 
 ## Firewall Rules
 
-### Host Firewall (nftables + iptables)
+### Host Firewall (nftables)
 
 **nftables** (`/etc/nftables.conf`):
 ```nft
@@ -86,25 +86,24 @@ chain input {
     udp dport 51820 accept          # WireGuard
     icmp accept
     
-    # From VPN (wg0)
-    iif "wg0" tcp dport 22 accept   # SSH
-    iif "wg0" tcp dport 9090 accept # Cockpit
-    iif "wg0" tcp dport 9443 accept # Portainer
+    # From VPN (wg0) - all users can SSH
+    iifname "wg0" tcp dport 22 accept                                    # SSH
     
-    # Block Lab VM from VDS services (defense in depth)
-    iif "virbr0" tcp dport { 22, 9443 } drop
-    iif "virbr0" accept              # Allow other Lab VM traffic
+    # Cockpit/Portainer - admins and instructors ONLY (not students)
+    iifname "wg0" ip saddr { 10.200.0.10-12 } tcp dport 9090 accept     # Cockpit - admins
+    iifname "wg0" ip saddr { 10.200.0.20-21 } tcp dport 9090 accept     # Cockpit - instructors
+    iifname "wg0" ip saddr { 10.200.0.10-12 } tcp dport 9443 accept     # Portainer - admins
+    iifname "wg0" ip saddr { 10.200.0.20-21 } tcp dport 9443 accept     # Portainer - instructors
+    
+    # Block Lab VM from VDS management services (defense in depth)
+    iifname "virbr0" tcp dport { 22, 9090, 9443 } drop
+    iifname "virbr0" accept              # Allow other Lab VM traffic
 }
 ```
 
-**iptables** (`/etc/iptables/rules.v4`) - Lab VM isolation:
-```bash
-# Block Lab VM (virbr0) from reaching VDS services
--A INPUT -i virbr0 -p tcp --dport 22 -j DROP
--A INPUT -i virbr0 -p tcp --dport 9443 -j DROP
-```
-
-> ⚠️ **Security**: Lab VM cannot reach VDS SSH (22) or Portainer (9443). If Lab VM is compromised, attackers cannot pivot to VDS control plane.
+> ⚠️ **Security**: 
+> - Students cannot access Cockpit (9090) or Portainer (9443) - firewall restricts to admin/instructor IPs
+> - Lab VM cannot reach VDS management ports. If Lab VM is compromised, attackers cannot pivot to VDS control plane
 
 ### Lab VM Firewall (nftables)
 
@@ -172,14 +171,27 @@ The script uses SSH key `/root/.ssh/portainer_labvm` to execute iptables rules o
 iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Enable NAT
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j DROP          # Block red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j DROP          # Block blue→red
+# Services routing (students NOT on services_net, need L3 routing)
+iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.3.0/24 -j ACCEPT        # Red→services
+iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.3.0/24 -j ACCEPT        # Blue→services
+iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.2.0/24 -j ACCEPT        # Services→red
+iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.1.0/24 -j ACCEPT        # Services→blue
 
 # Combat Phase (executed on Lab VM via SSH):
-iptables -t nat -D POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Disable NAT
+iptables -I FORWARD -s 172.20.0.0/16 ! -d 172.20.0.0/16 -o eth0 -j DROP # Block internet
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j ACCEPT        # Allow red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j ACCEPT        # Allow blue→red
+# Services routing (same as prep - students need access to targets)
+iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.3.0/24 -j ACCEPT        # Red→services
+iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.3.0/24 -j ACCEPT        # Blue→services
+iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.2.0/24 -j ACCEPT        # Services→red
+iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.1.0/24 -j ACCEPT        # Services→blue
 ```
 
-> 🔒 **Security**: Phase control runs on VDS, so even if Lab VM is compromised, attackers cannot modify the control scripts.
+> 🔒 **Security**: 
+> - Phase control runs on VDS, so even if Lab VM is compromised, attackers cannot modify the control scripts.
+> - Student containers are NOT on services_net (L2 isolation) - prevents cross-team communication via shared network.
+> - Access to services is controlled via L3 iptables routing, allowing filtering even in prep mode.
 
 ## Secrets Management
 

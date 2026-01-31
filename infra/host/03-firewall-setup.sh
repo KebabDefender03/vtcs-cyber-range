@@ -20,6 +20,10 @@ WG_PORT="51820"
 WG_SUBNET="10.200.0.0/24"
 LABVM_SUBNET="192.168.122.0/24"  # Default libvirt NAT network
 
+# Admin and Instructor IPs (only these can access management interfaces)
+ADMIN_IPS="10.200.0.10, 10.200.0.11, 10.200.0.12"  # admin1, admin2, admin3
+INSTRUCTOR_IPS="10.200.0.20, 10.200.0.21"          # instructor1, instructor2
+
 echo "=========================================="
 echo "VTCS Cyber Range - Host Firewall Setup"
 echo "=========================================="
@@ -72,15 +76,22 @@ table inet filter {
         # WireGuard VPN - ONLY port exposed to internet
         udp dport ${WG_PORT} accept comment "WireGuard VPN"
 
-        # === VPN-ONLY ACCESS ===
-        # SSH - only from VPN clients
-        ip saddr ${WG_SUBNET} tcp dport 22 accept comment "SSH via VPN only"
+        # === VPN-ONLY ACCESS (restricted to admins and instructors) ===
+        # SSH - only from VPN clients (all users can SSH to their assigned user)
+        iifname "wg0" tcp dport 22 accept comment "SSH via VPN only"
         
-        # Cockpit - only from VPN clients
-        ip saddr ${WG_SUBNET} tcp dport 9090 accept comment "Cockpit via VPN only"
+        # Cockpit - only admins and instructors (not students)
+        iifname "wg0" ip saddr { ${ADMIN_IPS} } tcp dport 9090 accept comment "Cockpit - admins"
+        iifname "wg0" ip saddr { ${INSTRUCTOR_IPS} } tcp dport 9090 accept comment "Cockpit - instructors"
+        
+        # Portainer - only admins and instructors (not students)
+        iifname "wg0" ip saddr { ${ADMIN_IPS} } tcp dport 9443 accept comment "Portainer - admins"
+        iifname "wg0" ip saddr { ${INSTRUCTOR_IPS} } tcp dport 9443 accept comment "Portainer - instructors"
 
         # Allow traffic from lab VM network (for host services if needed)
-        ip saddr ${LABVM_SUBNET} accept comment "Lab VM network"
+        # But block Lab VM from accessing management ports
+        iifname "virbr0" ip saddr ${LABVM_SUBNET} tcp dport { 22, 9090, 9443 } drop comment "Block Lab VM from management"
+        iifname "virbr0" accept comment "Lab VM network"
 
         # Log and drop everything else
         log prefix "[nftables DROP INPUT] " flags all counter drop
@@ -155,8 +166,9 @@ echo "=========================================="
 echo ""
 echo "SECURITY STATUS:"
 echo "  - Internet-exposed: Only WireGuard (UDP ${WG_PORT})"
-echo "  - SSH: VPN-only (${WG_SUBNET})"
-echo "  - Cockpit: VPN-only (${WG_SUBNET})"
+echo "  - SSH: VPN-only (all VPN clients)"
+echo "  - Cockpit: Admins + Instructors only (${ADMIN_IPS}, ${INSTRUCTOR_IPS})"
+echo "  - Portainer: Admins + Instructors only"
 echo "  - Lab VM network: ${LABVM_SUBNET}"
 echo ""
 echo "WARNING: Make sure you have a working VPN client config BEFORE"

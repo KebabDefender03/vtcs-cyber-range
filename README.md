@@ -91,6 +91,24 @@ VDS/
 
 Container start/stop/logs/restart is done via Portainer: https://10.200.0.1:9443
 
+### Workstation Activity Simulation
+
+The `workstation` container automatically generates realistic traffic patterns:
+- **Every 10-30 seconds**: One random activity from the following:
+  - HTTP GET requests to `http://webapp/` and `/index.php`
+  - Login attempts to `/login.php` with dummy credentials
+  - Access to vulnerable pages (`/vulnerabilities/sqli/`, `/vulnerabilities/xss_r/`)
+  - Database queries (`SELECT` from users table)
+  - Admin panel access (`/admin.php`)
+  - File operations (create/delete temp files)
+  - Network connectivity checks (ping to webapp/database)
+
+**Blue team visibility**: Network traffic capture via tcpdump from your blue container shows all HTTP requests, response codes, and timing patterns. This allows analysis of:
+- Request frequency and types
+- Response times
+- Error patterns
+- Attack detection (spike in requests, 403/500 errors)
+
 ### Phase Control (via lab.sh)
 
 Phase control runs on VDS Host (as admin or instructor):

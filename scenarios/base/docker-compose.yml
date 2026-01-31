@@ -21,7 +21,7 @@ services:
     command: tail -f /dev/null
     networks:
       - blue_net
-      - services_net  # Blue team can access services
+      # services_net removed - access via iptables routing (prevents cross-team via L2)
     volumes:
       - blue1_home:/root
     deploy:
@@ -40,7 +40,7 @@ services:
     command: tail -f /dev/null
     networks:
       - blue_net
-      - services_net
+      # services_net removed - access via iptables routing
     volumes:
       - blue2_home:/root
     deploy:
@@ -59,7 +59,7 @@ services:
     command: tail -f /dev/null
     networks:
       - blue_net
-      - services_net
+      # services_net removed - access via iptables routing
     volumes:
       - blue3_home:/root
     deploy:
@@ -81,7 +81,7 @@ services:
     command: tail -f /dev/null
     networks:
       - red_net
-      - services_net  # Red team can access services (attack targets)
+      # services_net removed - access via iptables routing (prevents cross-team via L2)
     volumes:
       - red1_home:/root
     deploy:
@@ -100,7 +100,7 @@ services:
     command: tail -f /dev/null
     networks:
       - red_net
-      - services_net
+      # services_net removed - access via iptables routing
     volumes:
       - red2_home:/root
     deploy:
@@ -119,7 +119,7 @@ services:
     command: tail -f /dev/null
     networks:
       - red_net
-      - services_net
+      # services_net removed - access via iptables routing
     volumes:
       - red3_home:/root
     deploy:
@@ -171,16 +171,42 @@ services:
     image: ubuntu:22.04
     container_name: workstation
     hostname: workstation
-    command: tail -f /dev/null
     networks:
       - services_net
+    volumes:
+      - ./workstation-activity.sh:/usr/local/bin/workstation-activity.sh:ro
+    environment:
+      - WEBAPP_URL=http://webapp
+      - DB_HOST=database
+      - DB_USER=dvwa
+      - DB_PASS=p@ssw0rd
+      - DB_NAME=dvwa
+    entrypoint: >
+      bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq curl mysql-client openssh-server > /dev/null 2>&1 &&
+        chmod +x /usr/local/bin/workstation-activity.sh &&
+        /usr/local/bin/workstation-activity.sh
+      "
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 1G
+        reservations:
+          memory: 256M
 
 # ============================================================================
 # NETWORKS
 # ============================================================================
 # Isolated networks for segmentation. Default: no inter-network communication.
 # Containers only see peers on their attached networks.
+#
+# SECURITY NOTE: Student containers (red/blue) are NOT on services_net.
+# This prevents Layer 2 cross-team communication. Access to services
+# (webapp, database, workstation) is controlled via iptables routing rules
+# in lab.sh, allowing L3 filtering between teams even in prep mode.
 # ============================================================================
 
 networks:

@@ -22,6 +22,7 @@ NC='\033[0m' # No Color
 PHASE_FILE="/tmp/cyberlab-phase"
 RED_NET="172.20.2.0/24"
 BLUE_NET="172.20.1.0/24"
+SERVICES_NET="172.20.3.0/24"
 DOCKER_NETS="172.20.0.0/16"
 
 # SSH to Lab VM (run from VDS)
@@ -95,19 +96,35 @@ cmd_prep() {
     
     # Clear any existing phase rules
     run_iptables "iptables -t nat -D POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${DOCKER_NETS} ! -d ${DOCKER_NETS} -o eth0 -j DROP 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP 2>/dev/null || true"
+    # Clear services routing rules
+    run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${SERVICES_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${SERVICES_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true"
     
     # PREP: Enable internet (NAT masquerade)
     log_info "Enabling internet access for containers..."
     run_iptables "iptables -t nat -A POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE"
+    # Ensure Docker per-network MASQUERADE rules exist (Docker usually creates these, but restore if missing)
+    run_iptables "iptables -t nat -C POSTROUTING -s ${RED_NET} ! -o br-red -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s ${RED_NET} ! -o br-red -j MASQUERADE"
+    run_iptables "iptables -t nat -C POSTROUTING -s ${BLUE_NET} ! -o br-blue -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s ${BLUE_NET} ! -o br-blue -j MASQUERADE"
     
     # PREP: Block cross-team traffic
     log_info "Blocking cross-team attacks..."
     run_iptables "iptables -I FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP"
     run_iptables "iptables -I FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP"
+    
+    # PREP: Allow access to services (students not on services_net, need routing)
+    log_info "Enabling access to services network..."
+    run_iptables "iptables -I FORWARD -s ${RED_NET} -d ${SERVICES_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${BLUE_NET} -d ${SERVICES_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT"
     
     # Save phase state
     echo "prep" > ${PHASE_FILE}
@@ -131,18 +148,35 @@ cmd_combat() {
     
     # Clear any existing phase rules
     run_iptables "iptables -t nat -D POSTROUTING -s ${DOCKER_NETS} -o eth0 -j MASQUERADE 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${DOCKER_NETS} ! -d ${DOCKER_NETS} -o eth0 -j DROP 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${BLUE_NET} -j DROP 2>/dev/null || true"
     run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${RED_NET} -j DROP 2>/dev/null || true"
+    # Clear services routing rules
+    run_iptables "iptables -D FORWARD -s ${RED_NET} -d ${SERVICES_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${BLUE_NET} -d ${SERVICES_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT 2>/dev/null || true"
+    run_iptables "iptables -D FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT 2>/dev/null || true"
     
-    # COMBAT: Disable internet (NAT rule already removed above)
+    # COMBAT: Disable internet (NAT rule already removed above, now block egress)
     log_info "Disabling internet access..."
+    run_iptables "iptables -I FORWARD -s ${DOCKER_NETS} ! -d ${DOCKER_NETS} -o eth0 -j DROP"
+    # Remove Docker's per-bridge MASQUERADE rules (created automatically by Docker)
+    run_iptables "iptables -t nat -D POSTROUTING -s ${RED_NET} ! -o br-red -j MASQUERADE 2>/dev/null || true"
+    run_iptables "iptables -t nat -D POSTROUTING -s ${BLUE_NET} ! -o br-blue -j MASQUERADE 2>/dev/null || true"
     
     # COMBAT: Enable cross-team traffic
     log_info "Enabling cross-team attacks..."
     run_iptables "iptables -I FORWARD -s ${RED_NET} -d ${BLUE_NET} -j ACCEPT"
     run_iptables "iptables -I FORWARD -s ${BLUE_NET} -d ${RED_NET} -j ACCEPT"
+    
+    # COMBAT: Allow access to services (students not on services_net, need routing)
+    log_info "Enabling access to services network..."
+    run_iptables "iptables -I FORWARD -s ${RED_NET} -d ${SERVICES_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${BLUE_NET} -d ${SERVICES_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT"
+    run_iptables "iptables -I FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT"
     
     # Save phase state
     echo "combat" > ${PHASE_FILE}
