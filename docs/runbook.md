@@ -172,7 +172,7 @@ Users created: labadmin1-3 (docker group), instructor1-2 (docker group).
 ```bash
 # From your local machine (in repo directory)
 # First, copy to VDS
-scp -r scenarios scripts Makefile root@10.200.0.1:/tmp/cyberlab/
+scp -r scenarios scripts root@10.200.0.1:/tmp/cyberlab/
 
 # Then from VDS to Lab VM
 ssh root@10.200.0.1

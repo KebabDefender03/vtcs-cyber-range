@@ -66,19 +66,20 @@ VDS/
 │   │   ├── 02-wireguard-setup.sh
 │   │   ├── 03-firewall-setup.sh
 │   │   ├── 04-cockpit-hardening.sh
-│   │   └── 05-create-labvm.sh
+│   │   ├── 05-create-labvm.sh
+│   │   └── 06-student-setup.sh
 │   └── labvm/                # Lab VM bootstrap
 │       └── 01-labvm-bootstrap.sh
 ├── scenarios/
 │   └── base/                 # Default lab scenario
 │       └── docker-compose.yml  # Deployed via Portainer from GitHub
 ├── scripts/
-│   └── lab.sh                # Phase control CLI (runs on VDS)
+│   ├── lab.sh                # Phase control CLI (runs on VDS)
+│   └── add-student.sh        # Student onboarding script
 ├── docs/
 │   ├── architecture.md       # System architecture
 │   ├── security.md           # Security controls
 │   └── runbook.md            # Step-by-step deployment
-├── Makefile                  # Convenience targets
 └── README.md
 ```
 
@@ -149,7 +150,7 @@ Access is via SSH keys (password auth is disabled for admins):
 | Role | Access | Auth Method |
 |------|--------|-------------|
 | Admin | VDS host + Lab VM (full shell) | SSH key only |
-| Instructor | VDS host (lab.sh only) + Portainer + Cockpit | Password |
+| Instructor | VDS host (lab.sh + add-student.sh) + Portainer + Cockpit | SSH key |
 | Student | VDS host → ForceCommand → container | SSH key only |
 
 > 💡 **Admins**: Use `ssh labvm` from VDS to connect to Lab VM (SSH config auto-selects key).

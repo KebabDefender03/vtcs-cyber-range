@@ -36,7 +36,6 @@ git status
 - ✅ `*.md` files (README, documentation)
 - ✅ `*.sh` scripts
 - ✅ `docker-compose.yml`
-- ✅ `Makefile`
 - ✅ `Dockerfile` files
 
 **What should be IGNORED:**
@@ -200,7 +199,6 @@ vtcs-cyber-range/
 ├── README.md            ✅ Tracked
 ├── MASTER-DOCUMENTATION.md  ✅ Tracked (no passwords)
 ├── GITHUB-SETUP.md      ✅ Tracked
-├── Makefile             ✅ Tracked
 ├── docs/
 │   ├── architecture.md  ✅ Tracked
 │   ├── security.md      ✅ Tracked

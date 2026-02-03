@@ -80,7 +80,7 @@
 **Security Principle**: VDS is the secure control plane. Lab VM is expendable.
 - If a container is compromised, it cannot reach VDS management services
 - All administrative actions go through VDS (never direct to Lab VM for instructors)
-- Phase control runs via: `VDS lab.sh` → SSH → `Lab VM /opt/cyberlab/scripts/phase_control.sh`
+- Phase control runs via: `VDS lab.sh` → SSH → `Lab VM iptables/nftables commands`
 
 ## Network Segmentation
 
@@ -140,8 +140,8 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | admin1 | Primary admin | host_admin1.key | Full |
 | admin2 | Backup admin | host_admin2.key | Full |
 | admin3 | Backup admin | host_admin3.key | Full |
-| instructor1 | Lab instructor | (password) | lab.sh only |
-| instructor2 | Lab instructor | (password) | lab.sh only |
+| instructor1 | Lab instructor | host_instructor1.key | lab.sh + add-student.sh |
+| instructor2 | Lab instructor | host_instructor2.key | lab.sh + add-student.sh |
 | red1 | Red Team Student | red1.key | None (ForceCommand) |
 | red2 | Red Team Student | red2.key | None (ForceCommand) |
 | red3 | Red Team Student | red3.key | None (ForceCommand) |
@@ -176,12 +176,12 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | admin3.conf | 10.200.0.12 | Admin 3 |
 | instructor1.conf | 10.200.0.20 | Instructor 1 |
 | instructor2.conf | 10.200.0.21 | Instructor 2 |
-| student-red1.conf | 10.200.0.100 | Red Team 1 |
-| student-red2.conf | 10.200.0.101 | Red Team 2 |
-| student-red3.conf | 10.200.0.102 | Red Team 3 |
-| student-blue1.conf | 10.200.0.110 | Blue Team 1 |
-| student-blue2.conf | 10.200.0.111 | Blue Team 2 |
-| student-blue3.conf | 10.200.0.112 | Blue Team 3 |
+| red1.conf | 10.200.0.100 | Red Team 1 |
+| red2.conf | 10.200.0.101 | Red Team 2 |
+| red3.conf | 10.200.0.102 | Red Team 3 |
+| blue1.conf | 10.200.0.110 | Blue Team 1 |
+| blue2.conf | 10.200.0.111 | Blue Team 2 |
+| blue3.conf | 10.200.0.112 | Blue Team 3 |
 
 ## Security Measures
 
@@ -306,6 +306,8 @@ Each GUI adds:
 - WireGuard config: `/etc/wireguard/wg0.conf`
 - Firewall rules: `/etc/nftables.conf` + `/etc/iptables/rules.v4`
 - Lab control script: `/opt/cyberlab/scripts/lab.sh`
+- Student onboarding: `/opt/cyberlab/scripts/add-student.sh`
+- Student packages: `/opt/cyberlab/student-packages/`
 - Lab VM SSH key (root): `/root/.ssh/portainer_labvm`
 - Shared Lab VM key: `/etc/cyberlab/keys/labvm_key` (for ForceCommand)
 - Global SSH config: `/etc/ssh/ssh_config.d/labvm.conf` (labvm alias)
@@ -368,6 +370,6 @@ docker exec -it red1 /bin/bash
 > **Note**: Container start/stop/restart is managed via Portainer (https://10.200.0.1:9443).
 
 ---
-**Document Version:** 1.1
-**Last Updated:** January 2026
+**Document Version:** 1.2
+**Last Updated:** February 2026
 **Classification:** Internal Use Only

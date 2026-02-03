@@ -50,7 +50,7 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 | Role | Access Level | Capabilities |
 |------|--------------|--------------|
 | Admin | Full | Host SSH, Cockpit, Portainer, Lab VM, all containers |
-| Instructor | VDS Limited | VDS SSH (lab.sh only), Cockpit, Portainer |
+| Instructor | VDS Limited | VDS SSH (lab.sh + add-student.sh), Cockpit, Portainer |
 | Red Team Student | Workspace | Own workspace + services_net targets |
 | Blue Team Student | Workspace | Own workspace + services_net monitoring |
 
@@ -168,7 +168,7 @@ The script uses SSH key `/root/.ssh/portainer_labvm` to execute iptables rules o
 
 ```bash
 # Preparation Phase (executed on Lab VM via SSH):
-iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -o eth0 -j MASQUERADE  # Enable NAT
+iptables -t nat -A POSTROUTING -s 172.20.0.0/16 -o enp1s0 -j MASQUERADE  # Enable NAT
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j DROP          # Block red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j DROP          # Block blue→red
 # Services routing (students NOT on services_net, need L3 routing)
@@ -178,7 +178,7 @@ iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.2.0/24 -j ACCEPT        # Service
 iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.1.0/24 -j ACCEPT        # Services→blue
 
 # Combat Phase (executed on Lab VM via SSH):
-iptables -I FORWARD -s 172.20.0.0/16 ! -d 172.20.0.0/16 -o eth0 -j DROP # Block internet
+iptables -I FORWARD -s 172.20.0.0/16 ! -d 172.20.0.0/16 -o enp1s0 -j DROP # Block internet
 iptables -I FORWARD -s 172.20.2.0/24 -d 172.20.1.0/24 -j ACCEPT        # Allow red→blue
 iptables -I FORWARD -s 172.20.1.0/24 -d 172.20.2.0/24 -j ACCEPT        # Allow blue→red
 # Services routing (same as prep - students need access to targets)
@@ -372,4 +372,4 @@ This environment is for **educational purposes only**:
 - Students sign acceptable use agreement
 
 ---
-**Last Updated:** January 2026
+**Last Updated:** February 2026
