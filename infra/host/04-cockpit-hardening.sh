@@ -51,11 +51,11 @@ for i in 1 2; do
     fi
 done
 
-# Configure sudoers for instructors (only allow lab.sh)
+# Configure sudoers for instructors (lab.sh and add-student.sh)
 cat > /etc/sudoers.d/instructors << 'EOF'
-# Instructors can only run lab.sh for phase control
-instructor1 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh
-instructor2 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh
+# Instructors can run lab.sh for phase control and add-student.sh for onboarding
+instructor1 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh, /opt/cyberlab/scripts/add-student.sh
+instructor2 ALL=(ALL) NOPASSWD: /opt/cyberlab/scripts/lab.sh, /opt/cyberlab/scripts/add-student.sh
 EOF
 chmod 440 /etc/sudoers.d/instructors
 
@@ -105,7 +105,7 @@ echo "Access Cockpit at: https://10.200.0.1:9090 (via VPN)"
 echo ""
 echo "Authorized users:"
 echo "  - admin1, admin2, admin3 (full access)"
-echo "  - instructor1, instructor2 (VM viewing, lab.sh only)"
+echo "  - instructor1, instructor2 (VM viewing, lab.sh + add-student.sh)"
 echo ""
 echo "Passwords must be set via user-packages or manually:"
 echo "  passwd admin1"

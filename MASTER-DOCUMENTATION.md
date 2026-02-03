@@ -3,73 +3,53 @@
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                              INTERNET                                     │
-└──────────────────────────────────┬───────────────────────────────────────┘
-                                   │
-                     ┌─────────────▼─────────────┐
-                     │   VDS Host (Contabo)      │
-                     │   62.171.146.215          │
-                     │   Ubuntu 24.04 LTS        │
-                     │                           │
-                     │   ┌───────────────────┐   │
-                     │   │ WireGuard VPN     │   │
-                     │   │ 10.200.0.1/24     │   │
-                     │   │ Port 51820/UDP    │   │
-                     │   └───────────────────┘   │
-                     │   ┌───────────────────┐   │
-                     │   │ Cockpit GUI       │   │
-                     │   │ Port 9090 (VPN)   │   │
-                     │   └───────────────────┘   │
-                     │   ┌───────────────────┐   │
-                     │   │ Portainer CE      │   │
-                     │   │ Port 9443 (VPN)   │   │
-                     │   └───────────────────┘   │
-                     │   ┌───────────────────┐   │
-                     │   │ nftables Firewall │   │
-                     │   └───────────────────┘   │
-                     │   ┌───────────────────┐   │
-                     │   │ KVM/libvirt       │   │
-                     │   └─────────┬─────────┘   │
-                     └─────────────┼─────────────┘
-                                   │ virbr0 (192.168.122.0/24)
-                     ┌─────────────▼─────────────┐
-                     │   Lab VM (192.168.122.10) │
-                     │   Ubuntu + Docker         │
-                     │   Portainer Agent (:9001) │
-                     │                           │
-                     │  ┌────────────────────────────────────────────┐
-                     │  │           SEGMENTED DOCKER NETWORKS        │
-                     │  │                                            │
-                     │  │  ┌──────────────┐    ┌──────────────┐      │
-                     │  │  │   RED_NET    │    │   BLUE_NET   │      │
-                     │  │  │ 172.20.2.0/24│    │ 172.20.1.0/24│      │
-                     │  │  │              │    │              │      │
-                     │  │  │ ┌────┐┌────┐ │    │ ┌────┐┌────┐ │      │
-                     │  │  │ │red1││red2│ │    │ │blue││blue│ │      │
-                     │  │  │ └────┘└────┘ │    │ │ 1  ││ 2  │ │      │
-                     │  │  │    ┌────┐    │    │ └────┘└────┘ │      │
-                     │  │  │    │red3│    │    │    ┌────┐    │      │
-                     │  │  │    └────┘    │    │    │blue│    │      │
-                     │  │  │      │       │    │    │ 3  │    │      │
-                     │  │  └──────┼───────┘    └────┼────┘    │      │
-                     │  │         │                 │          │      │
-                     │  │         └────────┬────────┘          │      │
-                     │  │                  │                   │      │
-                     │  │         ┌────────▼────────┐          │      │
-                     │  │         │  SERVICES_NET   │          │      │
-                     │  │         │  172.20.3.0/24  │          │      │
-                     │  │         │                 │          │      │
-                     │  │         │ ┌──────┐┌─────┐ │          │      │
-                     │  │         │ │webapp││ db  │ │          │      │
-                     │  │         │ │(DVWA)││MySQL│ │          │      │
-                     │  │         │ └──────┘└─────┘ │          │      │
-                     │  │         │ ┌────────────┐ │          │      │
-                     │  │         │ │workstation │ │          │      │
-                     │  │         │ └────────────┘ │          │      │
-                     │  │         └─────────────────┘          │      │
-                     │  └────────────────────────────────────────────┘
-                     └───────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                                   INTERNET                                    │
+└───────────────────────────────────────┬───────────────────────────────────────┘
+                                        │
+                                        │ UDP 51820 (WireGuard)
+                                        ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                               CONTABO VDS HOST                                │
+│                               (Ubuntu 24.04 LTS)                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │  HOST SERVICES                                                          │  │
+│  │  • WireGuard VPN Server (10.200.0.1)                                    │  │
+│  │  • SSH (VPN-only, port 22)                                              │  │
+│  │  • Cockpit (VPN-only, port 9090) - includes monitoring                  │  │
+│  │  • Portainer (VPN-only, port 9443) - container management               │  │
+│  │  • Lab control scripts (/opt/cyberlab/scripts/lab.sh)                   │  │
+│  │  • KVM/libvirt hypervisor                                               │  │
+│  │  • nftables + iptables firewall                                         │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                          │
+│                                    │ virbr0 (192.168.122.0/24)                │
+│                                    ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │                         LAB VM (KVM Guest)                              │  │
+│  │                         Ubuntu 24.04 Server                             │  │
+│  │                         192.168.122.10                                  │  │
+│  │  ┌───────────────────────────────────────────────────────────────────┐  │  │
+│  │  │                      DOCKER ENGINE                                │  │  │
+│  │  │                                                                   │  │  │
+│  │  │   ┌─────────────┐  ┌─────────────────────────┐  ┌─────────────┐   │  │  │
+│  │  │   │  RED_NET    │  │     SERVICES_NET        │  │  BLUE_NET   │   │  │  │
+│  │  │   │ 172.20.2.0  │  │      172.20.3.0         │  │ 172.20.1.0  │   │  │  │
+│  │  │   │             │  │                         │  │             │   │  │  │
+│  │  │   │ ┌─────────┐ │  │  ┌────────┐ ┌────────┐  │  │ ┌─────────┐ │   │  │  │
+│  │  │   │ │  Red1   │ │  │  │ WebApp │ │Database│  │  │ │  Blue1  │ │   │  │  │
+│  │  │   │ ├─────────┤ │  │  └────────┘ └────────┘  │  │ ├─────────┤ │   │  │  │
+│  │  │   │ │  Red2   │ │  │  ┌─────────────────┐    │  │ │  Blue2  │ │   │  │  │
+│  │  │   │ ├─────────┤ │  │  │   Workstation   │    │  │ ├─────────┤ │   │  │  │
+│  │  │   │ │  Red3   │ │  │  └─────────────────┘    │  │ │  Blue3  │ │   │  │  │
+│  │  │   │ └─────────┘ │  │                         │  │ └─────────┘ │   │  │  │
+│  │  │   └──────┬──────┘  └────────────┬────────────┘  └──────┬──────┘   │  │  │
+│  │  │          │                      │                      │          │  │  │
+│  │  │          └──────────────────────┴──────────────────────┘          │  │  │
+│  │  │                (Services accessible to both teams)                │  │  │
+│  │  └───────────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Security Architecture
@@ -77,23 +57,23 @@
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        VDS HOST (SECURE ZONE)                          │
-│   • All control scripts (/opt/cyberlab/scripts/lab.sh)                │
-│   • Portainer UI (9443) - Web management console                      │
-│   • Cockpit (9090) - System administration GUI                        │
-│   • WireGuard VPN server                                              │
-│   • nftables + iptables firewall rules                                │
-│   • Admin/Instructor accounts with limited sudo                       │
+│   • All control scripts (/opt/cyberlab/scripts/lab.sh)                 │
+│   • Portainer UI (9443) - Web management console                       │
+│   • Cockpit (9090) - System administration GUI                         │
+│   • WireGuard VPN server                                               │
+│   • nftables + iptables firewall rules                                 │
+│   • Admin/Instructor accounts with limited sudo                        │
 ├────────────────────────────────────────────────────────────────────────┤
 │                          FIREWALL BOUNDARY                             │
-│   • Lab VM blocked from VDS port 22 (SSH)                             │
-│   • Lab VM blocked from VDS port 9443 (Portainer)                     │
-│   • Only VDS can SSH to Lab VM (/root/.ssh/portainer_labvm key)       │
+│   • Lab VM blocked from VDS port 22 (SSH)                              │
+│   • Lab VM blocked from VDS port 9443 (Portainer)                      │
+│   • Only VDS can SSH to Lab VM (/root/.ssh/portainer_labvm key)        │
 ├────────────────────────────────────────────────────────────────────────┤
 │                      LAB VM (EXPENDABLE ZONE)                          │
-│   • Docker containers (all 10 lab containers)                         │
-│   • Portainer Agent only (port 9001)                                  │
-│   • No control scripts - receives commands via SSH from VDS           │
-│   • Can be wiped/rebuilt without affecting VDS                        │
+│   • Docker containers (all 10 lab containers)                          │
+│   • Portainer Agent only (port 9001)                                   │
+│   • No control scripts - receives commands via SSH from VDS            │
+│   • Can be wiped/rebuilt without affecting VDS                         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 

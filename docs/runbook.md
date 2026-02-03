@@ -217,44 +217,56 @@ database   Up             3306/tcp
 
 ## Phase 4: Create Student VPN Clients
 
-### Step 4.1: Create VPN Configs for All Users
+### Step 4.1: Add New Student (Automated)
+
+Use the `add-student.sh` script to create a complete student setup:
 
 ```bash
-# On VDS
-cd /etc/wireguard
-
-# Admins (VPN IPs: 10.200.0.10-12)
-./add-vpn-client.sh admin 10
-./add-vpn-client.sh admin2 11
-./add-vpn-client.sh admin3 12
-
-# Instructors (VPN IPs: 10.200.0.20-21)
-./add-vpn-client.sh instructor1 20
-./add-vpn-client.sh instructor2 21
-
-# Red team (VPN IPs: 10.200.0.100-102)
-./add-vpn-client.sh red1 100
-./add-vpn-client.sh red2 101
-./add-vpn-client.sh red3 102
-
-# Blue team (VPN IPs: 10.200.0.110-112)
-./add-vpn-client.sh blue1 110
-./add-vpn-client.sh blue2 111
-./add-vpn-client.sh blue3 112
+# On VDS (as admin with sudo)
+sudo /opt/cyberlab/scripts/add-student.sh red 4    # Creates red4
+sudo /opt/cyberlab/scripts/add-student.sh blue 4   # Creates blue4
 ```
 
-### Step 4.2: Distribute Configs Securely
+The script automatically:
+1. Creates VDS user (SSH key-only, no password)
+2. Generates SSH keypair for the student
+3. Creates WireGuard VPN peer and client config
+4. Adds SSH restrictions (VPN IP → username)
+5. Configures ForceCommand (auto-exec into container)
+6. Creates student package ZIP in admin home folders
 
-```bash
-# Collect all configs
-cd /etc/wireguard/clients
-tar czf /tmp/student-vpn-configs.tar.gz */
+### Step 4.2: Create Student Container in Portainer
 
-# Download to your machine (then distribute via secure channel)
-scp root@10.200.0.1:/tmp/student-vpn-configs.tar.gz ./
+1. Go to Portainer (https://10.200.0.1:9443)
+2. Navigate to Containers → Select existing team container (e.g., red1)
+3. Click "Duplicate/Edit"
+4. Change name to match student (e.g., red4)
+5. Verify network is correct (red_net or blue_net)
+6. Deploy the container
+
+### Step 4.3: Download Student Package
+
+From your local PC (with VPN connected):
+
+```powershell
+# Navigate to your user-packages folder
+cd "D:\path\to\VDS\user-packages"
+
+# Download the student ZIP (use your admin key)
+scp -i admin1\host_admin1.key admin1@10.200.0.1:~/red4.zip .
+
+# Extract if needed
+Expand-Archive red4.zip -DestinationPath red4
 ```
 
-⚠️ Distribute configs via secure channel (not email/chat).
+### Step 4.4: Distribute to Student
+
+Send the student their package containing:
+- `<name>.key` - SSH private key
+- `<name>.conf` - WireGuard VPN config
+- `README.txt` - Connection instructions
+
+⚠️ Distribute via secure channel (not email/chat).
 
 ---
 
@@ -441,20 +453,20 @@ nft list ruleset | grep 9090
 | services_net | 172.20.3.0/24 |
 | Admin VPN IPs | 10.200.0.10-12 |
 | Instructor VPN IPs | 10.200.0.20-21 |
-| Red Team VPN IPs | 10.200.0.100-102 |
-| Blue Team VPN IPs | 10.200.0.110-112 |
+| Red Team VPN IPs | 10.200.0.100-109 |
+| Blue Team VPN IPs | 10.200.0.110-119 |
 
 ### Default Credentials
 
 | System | Username | Authentication |
 |--------|----------|----------------|
 | VDS | admin1/2/3 | SSH key (host_adminX.key) |
-| VDS | instructor1/2 | Password (SSH to VDS, sudo for lab.sh only) |
+| VDS | instructor1/2 | SSH key (host_instructorX.key) |
 | VDS | root | SSH key (admin1 key authorized) + Contabo VNC password |
-| Cockpit | admin/instructor | Same as VDS password |
+| Cockpit | admin/instructor | Same as VDS credentials |
 | Portainer | admin/instructor | Separate Portainer account |
 | Lab VM | labadmin1/2/3 | `ssh labvm` from VDS (auto-uses key) |
-| VDS | red1/2/3, blue1/2/3 | SSH key to VDS, ForceCommand to container |
+| VDS | red1-10, blue1-10 | SSH key (<name>.key), ForceCommand to container |
 | DVWA | admin | password (default DVWA login) |
 
 ### Important Files
@@ -464,9 +476,12 @@ nft list ruleset | grep 9090
 | WireGuard config | `/etc/wireguard/wg0.conf` | VPN server |
 | Firewall rules (VDS) | `/etc/nftables.conf` + iptables | Host firewall |
 | Lab script (VDS) | `/opt/cyberlab/scripts/lab.sh` | Phase control CLI |
+| Add student script | `/opt/cyberlab/scripts/add-student.sh` | Student onboarding |
+| Student packages | `/opt/cyberlab/student-packages/` | SSH keys + VPN configs |
 | Portainer SSH key | `/root/.ssh/portainer_labvm` | Lab VM control |
 | Shared labvm key | `/etc/cyberlab/keys/labvm_key` | ForceCommand SSH to Lab VM |
 | Global SSH config | `/etc/ssh/ssh_config.d/labvm.conf` | labvm alias for all users |
+| SSH VPN restrictions | `/etc/ssh/sshd_config.d/50-vpn-restrictions.conf` | VPN IP → user mapping |
 | Portainer agent | Lab VM Docker | Container management |
 
 > **Note**: Docker Compose is deployed via Portainer from GitHub (KebabDefender03/vtcs-cyber-range), not stored locally on Lab VM.

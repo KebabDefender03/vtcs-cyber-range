@@ -34,8 +34,7 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture.
 
 1. **Clone this repo**
    ```bash
-   git clone <repo-url>
-   cd VDS
+   git clone https://github.com/KebabDefender03/vtcs-cyber-range
    ```
 
 2. **Deploy to VDS** (see [docs/runbook.md](docs/runbook.md) for details)

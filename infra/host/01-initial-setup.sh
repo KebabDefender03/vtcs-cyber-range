@@ -47,7 +47,9 @@ apt install -y \
     virtinst \
     bridge-utils \
     cockpit \
-    cockpit-machines
+    cockpit-machines \
+    zip \
+    unzip
 
 # Enable automatic security updates
 echo "[3/5] Configuring automatic security updates..."

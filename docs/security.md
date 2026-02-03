@@ -10,15 +10,15 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 ┌─────────────────────────────────────────────────────────────────┐
 │                    VDS HOST (SECURE ZONE)                       │
 │  • All control scripts run here                                 │
-│  • Portainer UI (9443) - VPN only                              │
-│  • Cockpit (9090) - VPN only                                   │
-│  • lab.sh controls Lab VM via SSH                              │
-│  • iptables blocks Lab VM from VDS services                    │
+│  • Portainer UI (9443) - VPN only                               │
+│  • Cockpit (9090) - VPN only                                    │
+│  • lab.sh controls Lab VM via SSH                               │
+│  • iptables blocks Lab VM from VDS services                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                    LAB VM (EXPENDABLE ZONE)                     │
-│  • If compromised via container escape, cannot affect VDS      │
-│  • Cannot reach VDS ports 22 or 9443                           │
-│  • Portainer Agent (9001) - only VDS can reach                 │
+│  • If compromised via container escape, cannot affect VDS       │
+│  • Cannot reach VDS ports 22 or 9443                            │
+│  • Portainer Agent (9001) - only VDS can reach                  │
 │  • All containers run here                                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
