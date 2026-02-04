@@ -159,6 +159,35 @@ systemctl restart nftables
 echo "[4/4] Verifying firewall rules..."
 nft list ruleset
 
+# ============================================================================
+# Docker Portainer Access Control (iptables DOCKER-USER chain)
+# ============================================================================
+# nftables cannot block traffic to Docker containers because Docker uses DNAT
+# in PREROUTING chain before nftables INPUT is evaluated. We must use iptables
+# DOCKER-USER chain to filter traffic to Portainer (port 9443).
+# ============================================================================
+echo ""
+echo "[5/5] Configuring Docker Portainer access control..."
+
+# Clear existing DOCKER-USER rules (keep RETURN at end)
+iptables -F DOCKER-USER 2>/dev/null || true
+
+# Allow admins and instructors (10.200.0.10-29) to access Portainer
+iptables -A DOCKER-USER -i wg0 -m iprange --src-range 10.200.0.10-10.200.0.29 -p tcp --dport 9443 -j ACCEPT
+
+# Block all other VPN traffic to Portainer (students are 10.200.0.100+)
+iptables -A DOCKER-USER -i wg0 -p tcp --dport 9443 -j DROP
+
+# Return for all other traffic (required for Docker to function)
+iptables -A DOCKER-USER -j RETURN
+
+# Save iptables rules for persistence
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/rules.v4
+
+echo "  - Portainer (9443): Allowed for 10.200.0.10-29 (admins/instructors)"
+echo "  - Portainer (9443): Blocked for 10.200.0.100+ (students)"
+
 echo ""
 echo "=========================================="
 echo "Host firewall setup complete!"
@@ -168,7 +197,7 @@ echo "SECURITY STATUS:"
 echo "  - Internet-exposed: Only WireGuard (UDP ${WG_PORT})"
 echo "  - SSH: VPN-only (all VPN clients)"
 echo "  - Cockpit: Admins + Instructors only (${ADMIN_IPS}, ${INSTRUCTOR_IPS})"
-echo "  - Portainer: Admins + Instructors only"
+echo "  - Portainer: Admins + Instructors only (10.200.0.10-29 via DOCKER-USER)"
 echo "  - Lab VM network: ${LABVM_SUBNET}"
 echo ""
 echo "WARNING: Make sure you have a working VPN client config BEFORE"

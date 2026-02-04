@@ -57,18 +57,11 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 ### VPN Client Assignment
 
 ```
-10.200.0.1    - VPN Server (Host)
-10.200.0.10   - Admin 1 (can also SSH as root)
-10.200.0.11   - Admin 2
-10.200.0.12   - Admin 3
-10.200.0.20   - Instructor 1
-10.200.0.21   - Instructor 2
-10.200.0.100  - Student Red1
-10.200.0.101  - Student Red2
-10.200.0.102  - Student Red3
-10.200.0.110  - Student Blue1
-10.200.0.111  - Student Blue2
-10.200.0.112  - Student Blue3
+10.200.0.1          - VPN Server (Host)
+10.200.0.10-19      - Admins (reserved range)
+10.200.0.20-29      - Instructors (reserved range)
+10.200.0.100-109    - Red Team students
+10.200.0.110-119    - Blue Team students
 ```
 
 > **VPN-to-User Binding**: Each VPN IP is restricted to SSH only as the corresponding user. Admin1 can additionally use root.
@@ -104,6 +97,32 @@ chain input {
 > ⚠️ **Security**: 
 > - Students cannot access Cockpit (9090) or Portainer (9443) - firewall restricts to admin/instructor IPs
 > - Lab VM cannot reach VDS management ports. If Lab VM is compromised, attackers cannot pivot to VDS control plane
+
+### Docker/Portainer Access Control (iptables DOCKER-USER)
+
+Because Portainer runs in a Docker container, nftables INPUT rules alone cannot block access - Docker uses DNAT to forward traffic before the INPUT chain is evaluated. To block students from Portainer, we use the `DOCKER-USER` iptables chain:
+
+```bash
+# Allow admins and instructors (10.200.0.10-29)
+sudo iptables -A DOCKER-USER -i wg0 -m iprange --src-range 10.200.0.10-10.200.0.29 -p tcp --dport 9443 -j ACCEPT
+
+# Block all other VPN traffic to Portainer
+sudo iptables -A DOCKER-USER -i wg0 -p tcp --dport 9443 -j DROP
+
+# Allow all other traffic (required for Docker to function)
+sudo iptables -A DOCKER-USER -j RETURN
+
+# Save rules for persistence
+sudo iptables-save | sudo tee /etc/iptables/rules.v4
+```
+
+**Result:**
+| IP Range | Users | Portainer Access |
+|----------|-------|------------------|
+| 10.200.0.10-29 | Admins + Instructors | ✅ Allowed |
+| 10.200.0.30+ | All students | ❌ Blocked |
+
+> 💡 New students added via `add-student.sh` are automatically blocked - no firewall changes needed.
 
 ### Lab VM Firewall (nftables)
 

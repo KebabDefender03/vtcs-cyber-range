@@ -451,8 +451,8 @@ nft list ruleset | grep 9090
 | blue_net | 172.20.1.0/24 |
 | red_net | 172.20.2.0/24 |
 | services_net | 172.20.3.0/24 |
-| Admin VPN IPs | 10.200.0.10-12 |
-| Instructor VPN IPs | 10.200.0.20-21 |
+| Admin VPN IPs | 10.200.0.10-19 (reserved) |
+| Instructor VPN IPs | 10.200.0.20-29 (reserved) |
 | Red Team VPN IPs | 10.200.0.100-109 |
 | Blue Team VPN IPs | 10.200.0.110-119 |
 

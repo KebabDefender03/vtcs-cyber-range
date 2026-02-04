@@ -183,6 +183,8 @@ Internet: ✅ ON                           Internet: ❌ OFF
 | blue2.conf | 10.200.0.111 | Blue Team 2 |
 | blue3.conf | 10.200.0.112 | Blue Team 3 |
 
+> **Reserved ranges**: 10.200.0.10-19 for admins, 10.200.0.20-29 for instructors
+
 ## Security Measures
 
 ### Network Security

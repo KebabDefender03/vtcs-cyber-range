@@ -61,7 +61,7 @@ The VTCS Cyber Range is a containerized red/blue team training environment desig
 ### VPN Network (10.200.0.0/24)
 - **Purpose**: Sole entry point from internet
 - **Server**: 10.200.0.1 (VDS host)
-- **Clients**: 10.200.0.10+ (admin), 10.200.0.100+ (students)
+- **Clients**: 10.200.0.10-29 (admins/instructors reserved), 10.200.0.100+ (students)
 - **Allowed destinations**: Host services, Lab VM network
 
 ### Host Network (192.168.122.0/24)
