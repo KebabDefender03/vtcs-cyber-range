@@ -37,7 +37,6 @@ apt install -y \
     lsb-release \
     git \
     vim \
-    htop \
     tmux \
     jq \
     make

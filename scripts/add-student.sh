@@ -107,6 +107,8 @@ wg syncconf wg0 <(wg-quick strip wg0)
 
 # 4. SSH RESTRICTIONS
 log_info "Configuring SSH restrictions..."
+
+# VPN IP restriction (only allow this user from their VPN IP)
 cat >> "$SSHD_CONF" << SSHVPN
 
 # ${STUDENT_NAME^} VPN (${VPN_IP})
@@ -114,10 +116,18 @@ Match Address ${VPN_IP}
     AllowUsers ${STUDENT_NAME}
 SSHVPN
 
-cat >> /etc/ssh/sshd_config << SSHFORCE
+# ForceCommand to container (same drop-in file as 06-student-setup.sh)
+cat >> /etc/ssh/sshd_config.d/students.conf << SSHFORCE
 
+# ${STUDENT_NAME^}
 Match User ${STUDENT_NAME}
     ForceCommand ssh -tt labvm docker exec -it ${STUDENT_NAME} bash
+    PasswordAuthentication no
+    PermitTTY yes
+    PermitTunnel no
+    AllowTcpForwarding no
+    X11Forwarding no
+    AllowAgentForwarding no
 SSHFORCE
 
 systemctl reload sshd

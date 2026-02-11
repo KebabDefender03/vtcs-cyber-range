@@ -20,9 +20,10 @@ WG_PORT="51820"
 WG_SUBNET="10.200.0.0/24"
 LABVM_SUBNET="192.168.122.0/24"  # Default libvirt NAT network
 
-# Admin and Instructor IPs (only these can access management interfaces)
-ADMIN_IPS="10.200.0.10, 10.200.0.11, 10.200.0.12"  # admin1, admin2, admin3
-INSTRUCTOR_IPS="10.200.0.20, 10.200.0.21"          # instructor1, instructor2
+# Management access IP ranges (must match VPN IP assignments)
+# See docs/security.md for IP allocation scheme
+ADMIN_RANGE="10.200.0.10-10.200.0.19"       # Reserved for admins (currently .10-.12)
+INSTRUCTOR_RANGE="10.200.0.20-10.200.0.29"  # Reserved for instructors (currently .20-.21)
 
 echo "=========================================="
 echo "VTCS Cyber Range - Host Firewall Setup"
@@ -38,11 +39,11 @@ fi
 apt install -y nftables
 
 # Backup existing rules
-echo "[1/4] Backing up existing firewall rules..."
+echo "[1/5] Backing up existing firewall rules..."
 nft list ruleset > /root/nftables-backup-$(date +%Y%m%d-%H%M%S).conf 2>/dev/null || true
 
 # Create nftables configuration
-echo "[2/4] Creating nftables firewall rules..."
+echo "[2/5] Creating nftables firewall rules..."
 cat > /etc/nftables.conf << EOF
 #!/usr/sbin/nft -f
 # ============================================================================
@@ -81,12 +82,14 @@ table inet filter {
         iifname "wg0" tcp dport 22 accept comment "SSH via VPN only"
         
         # Cockpit - only admins and instructors (not students)
-        iifname "wg0" ip saddr { ${ADMIN_IPS} } tcp dport 9090 accept comment "Cockpit - admins"
-        iifname "wg0" ip saddr { ${INSTRUCTOR_IPS} } tcp dport 9090 accept comment "Cockpit - instructors"
+        iifname "wg0" ip saddr ${ADMIN_RANGE} tcp dport 9090 accept comment "Cockpit - admins"
+        iifname "wg0" ip saddr ${INSTRUCTOR_RANGE} tcp dport 9090 accept comment "Cockpit - instructors"
         
         # Portainer - only admins and instructors (not students)
-        iifname "wg0" ip saddr { ${ADMIN_IPS} } tcp dport 9443 accept comment "Portainer - admins"
-        iifname "wg0" ip saddr { ${INSTRUCTOR_IPS} } tcp dport 9443 accept comment "Portainer - instructors"
+        # NOTE: These nftables rules are ineffective for Docker containers (DNAT bypass)
+        # Actual Portainer filtering is done via iptables DOCKER-USER chain below
+        iifname "wg0" ip saddr ${ADMIN_RANGE} tcp dport 9443 accept comment "Portainer - admins"
+        iifname "wg0" ip saddr ${INSTRUCTOR_RANGE} tcp dport 9443 accept comment "Portainer - instructors"
 
         # Allow traffic from lab VM network (for host services if needed)
         # But block Lab VM from accessing management ports
@@ -109,16 +112,13 @@ table inet filter {
         # Allow VPN clients to reach lab VM network
         ip saddr ${WG_SUBNET} ip daddr ${LABVM_SUBNET} accept comment "VPN to Lab VM"
         
-        # Allow lab VM to respond
+        # Allow lab VM to respond to VPN clients
         ip saddr ${LABVM_SUBNET} ip daddr ${WG_SUBNET} accept comment "Lab VM to VPN"
 
-        # Allow forwarding on WireGuard interface (handled by wg-quick PostUp)
-        iifname "wg0" accept
-        oifname "wg0" accept
-
-        # Allow libvirt bridge forwarding
-        iifname "virbr0" accept
-        oifname "virbr0" accept
+        # Allow lab VM to reach internet (for apt updates, etc.)
+        # This is controlled at runtime by lab.sh (prep/combat phases)
+        iifname "virbr0" oifname != "wg0" accept comment "Lab VM to internet"
+        oifname "virbr0" iifname != "wg0" ct state established,related accept comment "Internet to Lab VM (established)"
 
         # Log dropped forwards
         log prefix "[nftables DROP FORWARD] " flags all counter drop
@@ -151,12 +151,12 @@ table inet nat {
 EOF
 
 # Enable and start nftables
-echo "[3/4] Enabling nftables service..."
+echo "[3/5] Enabling nftables service..."
 systemctl enable nftables
 systemctl restart nftables
 
 # Verify rules are loaded
-echo "[4/4] Verifying firewall rules..."
+echo "[4/5] Verifying firewall rules..."
 nft list ruleset
 
 # ============================================================================
@@ -169,7 +169,7 @@ nft list ruleset
 echo ""
 echo "[5/5] Configuring Docker Portainer access control..."
 
-# Clear existing DOCKER-USER rules (keep RETURN at end)
+# Clear existing DOCKER-USER rules (flush all, then re-add RETURN)
 iptables -F DOCKER-USER 2>/dev/null || true
 
 # Allow admins and instructors (10.200.0.10-29) to access Portainer
@@ -196,7 +196,7 @@ echo ""
 echo "SECURITY STATUS:"
 echo "  - Internet-exposed: Only WireGuard (UDP ${WG_PORT})"
 echo "  - SSH: VPN-only (all VPN clients)"
-echo "  - Cockpit: Admins + Instructors only (${ADMIN_IPS}, ${INSTRUCTOR_IPS})"
+echo "  - Cockpit: Admins (${ADMIN_RANGE}) + Instructors (${INSTRUCTOR_RANGE})"
 echo "  - Portainer: Admins + Instructors only (10.200.0.10-29 via DOCKER-USER)"
 echo "  - Lab VM network: ${LABVM_SUBNET}"
 echo ""

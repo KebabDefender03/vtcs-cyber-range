@@ -31,8 +31,7 @@ for i in 1 2 3; do
     username="admin${i}"
     if ! id "${username}" &>/dev/null; then
         useradd -m -s /bin/bash -G sudo,libvirt "${username}"
-        # Generate random password (user must change via package)
-        echo "  Created user '${username}' (password in user-package)"
+        echo "  Created user '${username}'"
     else
         echo "  User '${username}' already exists"
     fi
@@ -45,7 +44,7 @@ for i in 1 2; do
         useradd -m -s /bin/bash "${username}"
         # Add to libvirt group for Cockpit VM management view
         usermod -aG libvirt "${username}"
-        echo "  Created user '${username}' (password in user-package)"
+        echo "  Created user '${username}'"
     else
         echo "  User '${username}' already exists"
     fi
@@ -78,10 +77,6 @@ IdleTimeout = 15
 
 # Require explicit login (no auto-login)
 LoginTitle = VTCS Cyber Range - Lab Management
-
-[Session]
-# Idle timeout for sessions
-IdleTimeout = 15
 EOF
 
 # Disable root login in Cockpit
@@ -107,7 +102,10 @@ echo "Authorized users:"
 echo "  - admin1, admin2, admin3 (full access)"
 echo "  - instructor1, instructor2 (VM viewing, lab.sh + add-student.sh)"
 echo ""
-echo "Passwords must be set via user-packages or manually:"
+echo "IMPORTANT: Set passwords for Cockpit/sudo access:"
 echo "  passwd admin1"
+echo "  passwd admin2"
+echo "  passwd admin3"
 echo "  passwd instructor1"
+echo "  passwd instructor2"
 echo ""

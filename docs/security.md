@@ -82,9 +82,11 @@ chain input {
     # From VPN (wg0) - all users can SSH
     iifname "wg0" tcp dport 22 accept                                    # SSH
     
-    # Cockpit/Portainer - admins and instructors ONLY (not students)
+    # Cockpit - admins and instructors ONLY (effective for host service)
     iifname "wg0" ip saddr { 10.200.0.10-12 } tcp dport 9090 accept     # Cockpit - admins
     iifname "wg0" ip saddr { 10.200.0.20-21 } tcp dport 9090 accept     # Cockpit - instructors
+    
+    # Portainer nftables rules (INEFFECTIVE - see note below)
     iifname "wg0" ip saddr { 10.200.0.10-12 } tcp dport 9443 accept     # Portainer - admins
     iifname "wg0" ip saddr { 10.200.0.20-21 } tcp dport 9443 accept     # Portainer - instructors
     
@@ -94,9 +96,13 @@ chain input {
 }
 ```
 
-> ⚠️ **Security**: 
-> - Students cannot access Cockpit (9090) or Portainer (9443) - firewall restricts to admin/instructor IPs
-> - Lab VM cannot reach VDS management ports. If Lab VM is compromised, attackers cannot pivot to VDS control plane
+> ⚠️ **IMPORTANT - nftables vs Docker**: 
+> - **Cockpit (9090)** runs directly on the host → nftables INPUT rules **are effective**
+> - **Portainer (9443)** runs in Docker → nftables INPUT rules **are NOT effective** because Docker uses DNAT in PREROUTING before INPUT is evaluated. Portainer access is controlled via iptables DOCKER-USER chain (see below).
+> - Students cannot access Cockpit (nftables) or Portainer (DOCKER-USER iptables)
+> - Lab VM cannot reach VDS management ports
+>
+> ⚠️ **nftables + iptables coexistence**: Ubuntu 24.04 uses iptables-nft backend by default. Both firewall systems can run simultaneously, but care must be taken to avoid rule conflicts. In this setup, nftables handles host traffic and iptables handles Docker traffic only.
 
 ### Docker/Portainer Access Control (iptables DOCKER-USER)
 
@@ -120,9 +126,46 @@ sudo iptables-save | sudo tee /etc/iptables/rules.v4
 | IP Range | Users | Portainer Access |
 |----------|-------|------------------|
 | 10.200.0.10-29 | Admins + Instructors | ✅ Allowed |
-| 10.200.0.30+ | All students | ❌ Blocked |
+| 10.200.0.100+ | All students | ❌ Blocked |
 
-> 💡 New students added via `add-student.sh` are automatically blocked - no firewall changes needed.
+> 💡 **Why 10.200.0.10-29?** The range is intentionally broader than currently assigned users (.10-.12 admins, .20-.21 instructors) to allow future growth without firewall changes. IPs .13-.19 and .22-.29 are reserved but not yet assigned. The iptables range approach is simpler than listing individual IPs and easier to maintain.
+>
+> 💡 New students added via `add-student.sh` get IPs in the 10.200.0.100+ range and are automatically blocked - no firewall changes needed.
+
+### Host FORWARD Chain (Traffic Routing)
+
+The VDS host routes traffic between VPN clients and the Lab VM. The FORWARD chain controls what traffic is allowed to pass through:
+
+```nft
+chain forward {
+    policy drop;
+    
+    # Allow established/related (return traffic)
+    ct state established,related accept
+    
+    # VPN ↔ Lab VM bidirectional
+    ip saddr 10.200.0.0/24 ip daddr 192.168.122.0/24 accept  # VPN to Lab VM
+    ip saddr 192.168.122.0/24 ip daddr 10.200.0.0/24 accept  # Lab VM to VPN
+    
+    # Lab VM to internet (controlled by lab.sh phases)
+    iifname "virbr0" oifname != "wg0" accept                  # Lab VM outbound
+    oifname "virbr0" iifname != "wg0" ct state established,related accept  # Return traffic
+    
+    # Everything else is logged and dropped
+    log prefix "[nftables DROP FORWARD] " drop
+}
+```
+
+**Allowed traffic flows:**
+| Source | Destination | Allowed? |
+|--------|-------------|----------|
+| VPN clients | Lab VM | ✅ Yes |
+| Lab VM | VPN clients | ✅ Yes |
+| Lab VM | Internet | ✅ Yes (runtime control via lab.sh) |
+| VPN client | VPN client | ❌ No (no inter-client routing) |
+| Internet | Lab VM | ❌ No (except established) |
+
+> 💡 **Security note**: VPN clients cannot directly communicate with each other through the VDS - only with the Lab VM network.
 
 ### Lab VM Firewall (nftables)
 

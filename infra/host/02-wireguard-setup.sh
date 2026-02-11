@@ -68,10 +68,9 @@ PrivateKey = ${SERVER_PRIVATE_KEY}
 
 # Enable IP forwarding for VPN clients to reach internal services
 PostUp = sysctl -w net.ipv4.ip_forward=1
-PostUp = iptables -A FORWARD -i %i -j ACCEPT
-PostUp = iptables -A FORWARD -o %i -j ACCEPT
-PostDown = iptables -D FORWARD -i %i -j ACCEPT
-PostDown = iptables -D FORWARD -o %i -j ACCEPT
+
+# Note: Forwarding rules are handled by nftables (03-firewall-setup.sh)
+# Do not add iptables FORWARD rules here - they conflict with nftables
 
 # Peer configurations are added below by the add-vpn-client.sh script
 # Each peer gets a unique IP in the 10.200.0.0/24 range

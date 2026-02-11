@@ -37,24 +37,6 @@ run_cmd() {
     fi
 }
 
-# Configure nftables with SUBNET rules (works for ANY container on the network)
-configure_nftables() {
-    local mode="$1"
-    log_info "Configuring nftables ($mode)..."
-
-    # Services access (both phases) - SUBNET based!
-    run_cmd "nft insert rule ip raw PREROUTING ip saddr ${RED_NET} ip daddr ${SERVICES_NET} accept 2>/dev/null || true"
-    run_cmd "nft insert rule ip raw PREROUTING ip saddr ${BLUE_NET} ip daddr ${SERVICES_NET} accept 2>/dev/null || true"
-    run_cmd "nft insert rule ip raw PREROUTING ip saddr ${SERVICES_NET} ip daddr ${RED_NET} accept 2>/dev/null || true"
-    run_cmd "nft insert rule ip raw PREROUTING ip saddr ${SERVICES_NET} ip daddr ${BLUE_NET} accept 2>/dev/null || true"
-
-    # Cross-team (combat only)
-    if [[ "$mode" == "combat" ]]; then
-        run_cmd "nft insert rule ip raw PREROUTING ip saddr ${RED_NET} ip daddr ${BLUE_NET} accept 2>/dev/null || true"
-        run_cmd "nft insert rule ip raw PREROUTING ip saddr ${BLUE_NET} ip daddr ${RED_NET} accept 2>/dev/null || true"
-    fi
-}
-
 cmd_prep() {
     log_info "Activating PREPARATION phase..."
     echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
@@ -82,7 +64,6 @@ cmd_prep() {
     run_cmd "iptables -I FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT"
     run_cmd "iptables -I FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT"
 
-    configure_nftables "prep"
     run_cmd "echo 'prep' > ${PHASE_FILE}; date >> ${PHASE_FILE}"
     log_info "Preparation phase ACTIVE"
 }
@@ -114,7 +95,6 @@ cmd_combat() {
     run_cmd "iptables -I FORWARD -s ${SERVICES_NET} -d ${RED_NET} -j ACCEPT"
     run_cmd "iptables -I FORWARD -s ${SERVICES_NET} -d ${BLUE_NET} -j ACCEPT"
 
-    configure_nftables "combat"
     run_cmd "echo 'combat' > ${PHASE_FILE}; date >> ${PHASE_FILE}"
     log_info "Combat phase ACTIVE"
     echo -e "${RED}⚔️  LET THE BATTLE BEGIN! ⚔️${NC}"

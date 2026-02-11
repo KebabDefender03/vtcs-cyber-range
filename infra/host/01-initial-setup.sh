@@ -34,12 +34,11 @@ apt install -y \
     wget \
     git \
     vim \
-    htop \
     tmux \
     fail2ban \
     unattended-upgrades \
     apt-listchanges \
-    ufw \
+    nftables \
     wireguard \
     qemu-kvm \
     libvirt-daemon-system \
