@@ -137,8 +137,7 @@ sudo /opt/cyberlab/scripts/lab.sh phase     # Check current phase
 | Portainer Agent | Latest | Remote management from VDS |
 | nftables | Latest | VM firewall |
 
-> ⚠️ **Security Note**: Lab VM is considered "expendable" - all control scripts run on VDS.
-> If Lab VM is compromised via container escape, it cannot affect VDS control plane.
+> ⚠️ **Security Note**: Lab VM is "expendable" - all control scripts run on VDS. If issues occur, restore from snapshot.
 
 
 ## Monitoring
@@ -171,11 +170,11 @@ Monitoring is provided via **Cockpit** - a simple, built-in web console that req
 
 | Container | Base Image | Resources | Networks | Notes |
 |-----------|------------|-----------|----------|-------|
-| blue1-3 | Kali Linux | 0.5 CPU, 2GB RAM | blue_net only | Services access via L3 routing |
-| red1-3 | Kali Linux | 0.5 CPU, 2GB RAM | red_net only | Services access via L3 routing |
+| blue1-3 | Kali Linux | 0.4 CPU, 2GB RAM | blue_net only | Services access via L3 routing |
+| red1-3 | Kali Linux | 0.4 CPU, 2GB RAM | red_net only | Services access via L3 routing |
 | workstation | Ubuntu 22.04 | 0.3 CPU, 1GB RAM | services_net | Generates realistic background activity |
-| webapp | DVWA | 0.5 CPU, 1GB RAM | services_net | Vulnerable application |
-| database | MySQL 5.7 | 0.5 CPU, 1GB RAM | services_net | Backend database |
+| webapp | DVWA | 0.4 CPU, 1GB RAM | services_net | Vulnerable application |
+| database | MySQL 5.7 | 0.4 CPU, 1GB RAM | services_net | Backend database |
 | portainer_agent | Portainer Agent | Minimal | bridge (172.17.0.0/16) | Remote management |
 
 **Total: 10 containers** (6 workspaces + workstation + webapp + database + agent)
@@ -235,21 +234,29 @@ Incident detection
 
 ## Resource Allocation
 
-Total VDS resources: 3 CPU cores, 24 GB RAM
+### VDS Host (3 physical cores + hyperthreading = 6 vCPUs, 24 GB RAM)
 
-| Component | CPU | RAM | Notes |
-|-----------|-----|-----|-------|
-| Host OS | 0.5 | 2 GB | Base overhead |
-| WireGuard/Firewall | 0.1 | 128 MB | Minimal |
-| Cockpit | 0.1 | 256 MB | When active |
-| Lab VM overhead | 0.3 | 2 GB | KVM/QEMU |
-| 6 Workspaces | 3.0 | 12 GB | 0.5 CPU, 2GB each |
-| Workstation | 0.3 | 1 GB | Ubuntu 22.04 |
-| WebApp | 0.5 | 1 GB | DVWA |
-| Database | 0.5 | 1 GB | MySQL |
-| **Total** | ~5.3 | ~19.4 GB | Within limits |
+| Component | vCPUs | RAM | Notes |
+|-----------|-------|-----|-------|
+| Host OS + Services | 2 vCPUs | 8 GB | WireGuard, Cockpit, Portainer, nftables |
+| Lab VM (KVM) | 4 vCPUs | 16 GB | Docker containers |
+| **Total** | 6 vCPUs | 24 GB | No overcommitment |
 
-Note: CPU is overcommitted but acceptable for burst workloads.
+> **Note**: Contabo VDS with 3 physical cores includes hyperthreading, providing 6 logical CPUs (vCPUs). Lab VM allocation of 4 vCPUs leaves 2 vCPUs for the host.
+
+### Lab VM Containers (within 4 vCPUs, 16 GB RAM)
+
+| Container | CPU Limit | RAM Limit | Notes |
+|-----------|-----------|-----------|-------|
+| blue1, blue2, blue3 | 0.4 each (1.2 total) | 2 GB each (6 GB) | Kali workspaces |
+| red1, red2, red3 | 0.4 each (1.2 total) | 2 GB each (6 GB) | Kali workspaces |
+| workstation | 0.3 | 1 GB | Traffic generator |
+| webapp | 0.4 | 1 GB | DVWA |
+| database | 0.4 | 1 GB | MySQL |
+| portainer_agent | minimal | minimal | Management |
+| **Total** | ~3.5 CPU | ~15 GB | Within VM limits |
+
+> **Note**: Container CPU limits are fractions of a single CPU core. Total 3.5 fits comfortably within 4 vCPUs.
 
 ## Isolation Mechanisms
 
@@ -263,14 +270,13 @@ Note: CPU is overcommitted but acceptable for burst workloads.
 
 ### Level 1: Container Reset
 ```bash
-# Reset specific workspace
-docker restart blue1
+# Via Portainer (https://10.200.0.1:9443):
+# - Restart container: Containers → select → Restart
+# - Reset stack: Stacks → vtcs → Redeploy
 
-# Reset all workspaces but keep data
-docker compose restart
-
-# Reset everything including data
-docker compose down -v && docker compose up -d
+# Or via CLI on Lab VM:
+docker restart blue1          # Reset specific workspace
+docker stop $(docker ps -q)   # Stop all, then redeploy via Portainer
 ```
 
 ### Level 2: Lab VM Snapshot

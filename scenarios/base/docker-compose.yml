@@ -7,7 +7,8 @@
 # - Target services (DVWA, database, workstation)
 # - Isolated networks with controlled connectivity
 #
-# Resource limits are set to allow 6 concurrent users on 3 CPU cores
+# Lab VM: 4 vCPUs, 16GB RAM (from VDS with 6 vCPUs total)
+# Container totals: ~3.5 CPU limit, ~15GB RAM
 # ============================================================================
 
 services:
@@ -27,7 +28,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -46,7 +47,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -65,7 +66,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -87,7 +88,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -106,7 +107,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -125,7 +126,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.4'
           memory: 2G
         reservations:
           memory: 512M
@@ -149,6 +150,13 @@ services:
     depends_on:
       - database
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 1G
+        reservations:
+          memory: 256M
 
   # Database service for DVWA
   database:
@@ -165,6 +173,13 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 1G
+        reservations:
+          memory: 256M
   
   # Workstation (additional target)
   workstation:
@@ -244,7 +259,8 @@ networks:
 # VOLUMES
 # ============================================================================
 # Persistent storage for workspaces and services.
-# Reset by: docker compose down -v
+# Reset via Portainer: Stacks → vtcs → Editor → Redeploy with "Re-pull and redeploy"
+# Or via CLI: docker volume rm $(docker volume ls -q --filter name=vtcs_)
 # ============================================================================
 
 volumes:

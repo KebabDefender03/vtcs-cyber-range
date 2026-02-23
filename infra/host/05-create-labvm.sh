@@ -5,7 +5,9 @@
 # Creates the Ubuntu Lab VM using libvirt/KVM.
 # This VM will host Docker and all lab containers.
 #
-# Resources: 2 vCPUs, 16GB RAM (leaves 8GB for host + overhead)
+# Resources: 4 vCPUs, 16GB RAM
+# VDS has 3 physical cores with hyperthreading = 6 vCPUs total
+# Lab VM: 4 vCPUs, Host: 2 vCPUs 
 # Storage: 80GB qcow2 disk
 # Network: NAT via virbr0 (192.168.122.x)
 # ============================================================================
@@ -15,7 +17,7 @@ set -euo pipefail
 # Configuration
 VM_NAME="labvm"
 VM_RAM="16384"      # 16GB in MB
-VM_VCPUS="2"
+VM_VCPUS="4"
 VM_DISK_SIZE="80"   # GB
 VM_DISK_PATH="/var/lib/libvirt/images/${VM_NAME}.qcow2"
 UBUNTU_ISO_URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso"

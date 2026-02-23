@@ -178,20 +178,18 @@ cat > /opt/cyberlab/README.md << 'EOF'
 # VTCS Cyber Range Lab VM
 
 This VM hosts the Docker-based lab environment.
+Containers are deployed via Portainer from GitHub (not locally).
 
 ## Directory Structure
-- `/opt/cyberlab/scenarios/` - Docker Compose scenario files
-- `/opt/cyberlab/scripts/` - Helper scripts (start/stop/reset)
 - `/opt/cyberlab/data/` - Persistent data (databases, etc.)
 - `/opt/cyberlab/logs/` - Log files
 
-## Quick Commands
-```bash
-cd /opt/cyberlab/scenarios/base
-docker compose up -d      # Start lab
-docker compose down       # Stop lab
-docker compose down -v    # Stop and reset volumes
-```
+## Container Management
+All container operations are done via Portainer:
+- Access: https://10.200.0.1:9443 (VPN required)
+- Deploy: Stacks → Add stack → Repository
+- Restart: Containers → select → Restart
+- Logs: Containers → select → Logs
 
 ## Network Layout
 - blue_net: 172.20.1.0/24 (Blue team workspaces)
@@ -212,8 +210,9 @@ echo ""
 echo "Lab directory: /opt/cyberlab/"
 echo ""
 echo "NEXT STEPS:"
-echo "1. Copy scenario files to /opt/cyberlab/scenarios/"
-echo "2. Run 'docker compose up -d' to start the lab"
+echo "1. Deploy Portainer Agent on this VM"
+echo "2. Add this VM as endpoint in Portainer (VDS host)"
+echo "3. Deploy stack from GitHub via Portainer"
 echo ""
 echo "Note: Log out and back in for docker group membership to apply,"
 echo "or run: newgrp docker"

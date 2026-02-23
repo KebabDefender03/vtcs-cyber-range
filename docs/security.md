@@ -16,14 +16,14 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 │  • iptables blocks Lab VM from VDS services                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                    LAB VM (EXPENDABLE ZONE)                     │
-│  • If compromised via container escape, cannot affect VDS       │
-│  • Cannot reach VDS ports 22 or 9443                            │
+│  • Cannot reach VDS management ports (22, 9443)                 │
 │  • Portainer Agent (9001) - only VDS can reach                  │
 │  • All containers run here                                      │
+│  • If issues occur, restore from snapshot                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-> 🔒 **Key Principle**: VDS is the secure control plane. Lab VM is "expendable" - if compromised, restore from snapshot.
+> 🔒 **Key Principle**: VDS is the secure control plane. Lab VM is "expendable" - if issues occur, restore from snapshot.
 
 ## Security Objectives
 
@@ -60,8 +60,8 @@ The VTCS Cyber Range implements a defense-in-depth security model with multiple 
 10.200.0.1          - VPN Server (Host)
 10.200.0.10-19      - Admins (reserved range)
 10.200.0.20-29      - Instructors (reserved range)
-10.200.0.100-109    - Red Team students
-10.200.0.110-119    - Blue Team students
+10.200.0.100-109    - Red Team students (reserved range)
+10.200.0.110-119    - Blue Team students (reserved range)
 ```
 
 > **VPN-to-User Binding**: Each VPN IP is restricted to SSH only as the corresponding user. Admin1 can additionally use root.
@@ -211,7 +211,7 @@ The lab supports two operational phases:
 - Typical duration: First 30 minutes of session
 
 ### Combat Phase
-- Internet access is cut (no external help)
+- Internet access is cut
 - Cross-team attacks enabled (Red vs Blue!)
 - This is the active exercise period
 
@@ -251,9 +251,9 @@ iptables -I FORWARD -s 172.20.3.0/24 -d 172.20.1.0/24 -j ACCEPT        # Service
 ```
 
 > 🔒 **Security**: 
-> - Phase control runs on VDS, so even if Lab VM is compromised, attackers cannot modify the control scripts.
-> - Student containers are NOT on services_net (L2 isolation) - prevents cross-team communication via shared network.
-> - Access to services is controlled via L3 iptables routing, allowing filtering even in prep mode.
+> - Phase control runs on VDS, not on Lab VM
+> - Student containers are NOT on services_net (L2 isolation) - prevents cross-team communication via shared network
+> - Access to services is controlled via L3 iptables routing, allowing filtering even in prep mode
 
 ## Secrets Management
 
@@ -263,7 +263,6 @@ The following are excluded via `.gitignore`:
 - `.env` files (database passwords, etc.)
 - WireGuard private keys
 - SSH private keys
-- TLS certificates
 
 ### Secrets Storage
 
@@ -330,14 +329,7 @@ The following are excluded via `.gitignore`:
 
 ### Security Note on Logging
 
-**Lab VM logs are NOT tamper-proof.** If a container escape occurs, an attacker could:
-- Delete or modify logs on Lab VM
-- Hide their tracks before detection
-
-**Mitigation options (not yet implemented):**
-1. **Syslog forwarding to VDS** - Logs stream in real-time, survive Lab VM compromise
-2. **VM snapshots** - Restore to known-good state after incidents
-3. **Accept risk** - For training purposes, reset environment if compromised
+Lab VM logs are stored locally. For this POC training environment, this is acceptable.
 
 Current approach: Logs on Lab VM + regular snapshots. Admins can investigate via VDS Cockpit.
 
@@ -380,24 +372,6 @@ virsh snapshot-revert labvm clean-baseline
 - [x] Resource limits (CPU, memory)
 - [x] No privileged containers
 - [x] Read-only filesystems where appropriate
-- [ ] AppArmor/SELinux profiles (future enhancement)
-
-## Known Limitations (POC)
-
-1. **No container escape protection**: Students with sudo in containers could potentially escape
-   - Mitigation: Education, monitoring, regular resets
-   
-2. ~~**Shared credentials**~~: **RESOLVED** - Per-user SSH keys implemented with ForceCommand
-   - Each user has unique SSH keypair
-   - Students auto-exec into their assigned container
-
-3. **No network traffic encryption between containers**
-   - Mitigation: Acceptable for training; attackers can sniff (realistic)
-
-4. ~~**Single admin account**~~: **RESOLVED** - Multiple admin accounts created
-   - 3 VDS host admins (admin1, admin2, admin3)
-   - 3 Lab VM admins (labadmin1, labadmin2, labadmin3)
-   - 2 Instructor accounts with limited privileges
 
 ## Security Testing
 
@@ -431,7 +405,6 @@ This environment is for **educational purposes only**:
 - No real user data
 - No production systems
 - Isolated from university networks
-- Students sign acceptable use agreement
 
 ---
 **Last Updated:** February 2026

@@ -78,7 +78,7 @@
 ```
 
 **Security Principle**: VDS is the secure control plane. Lab VM is expendable.
-- If a container is compromised, it cannot reach VDS management services
+- Containers cannot reach VDS management services
 - All administrative actions go through VDS (never direct to Lab VM for instructors)
 - Phase control runs via: `VDS lab.sh` → SSH → `Lab VM iptables/nftables commands`
 
@@ -206,7 +206,7 @@ Internet: ✅ ON                           Internet: ❌ OFF
 - ✅ Each student has dedicated container
 - ✅ Containers cannot access host filesystem
 - ✅ Docker socket not exposed to students
-- ✅ Resource limits applied (0.5 CPU, 2GB RAM per workspace)
+- ✅ Resource limits applied (0.4 CPU, 2GB RAM per workspace)
 - ✅ Network namespace isolation between teams
 
 ## GUI Access Options
@@ -279,11 +279,9 @@ Each GUI adds:
 3. Check logs: `docker logs red1`
 4. Optionally remove them from authorized_keys
 
-### If Malware Escapes Container:
-1. SSH to Lab VM, stop all containers: `docker stop $(docker ps -q)`
-2. Check host for compromise
-3. If compromised, shutdown VM and restore from backup
-4. Contact security team
+### If Lab VM Needs Reset:
+1. Restore from snapshot via Cockpit
+2. Redeploy stack via Portainer
 
 ## Maintenance Tasks
 
@@ -300,7 +298,6 @@ Each GUI adds:
 ### After Each Session:
 - Review logs
 - Reset DVWA database if needed
-- Check for container escape attempts
 
 ## File Locations
 

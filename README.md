@@ -23,6 +23,109 @@ Internet → WireGuard VPN → VDS Host → KVM Lab VM → Docker Containers
 
 See [docs/architecture.md](docs/architecture.md) for detailed architecture.
 
+## Data Flow Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                 DATA FLOWS POC                                   │
+│                                                                                  │
+│  This diagram shows the BASE SCENARIO. Everything under "Docker Engine"          │
+│  (containers, networks, services) can be customized via custom scenarios.        │
+│  Scenarios are deployed as Portainer Stacks AFTER initial host/VM setup.         │
+│  Source files: scenarios/<name>/docker-compose.yml (deployed from GitHub repo)   │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+                                   ┌───────────┐
+                                   │ INTERNET  │
+                                   └─────┬─────┘
+                                         │
+                                         │ UDP 51820 (only open port)
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                            VDS HOST (62.171.146.215)                             │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │                       WireGuard VPN (wg0: 10.200.0.1)                      │  │
+│  │                                                                            │  │
+│  │  ┌────────────────────┐   ┌───────────────────┐   ┌────────────────────┐   │  │
+│  │  │       Admin        │   │    Instructor     │   │      Student       │   │  │
+│  │  │   10.200.0.10-19   │   │   10.200.0.20-29  │   │   10.200.0.100+    │   │  │
+│  │  └──────────┬─────────┘   └─────────┬─────────┘   └──────────┬─────────┘   │  │
+│  └─────────────┼───────────────────────┼────────────────────────┼─────────────┘  │
+│                │                       │                        │                │
+│                │                       │                        │                │
+│                ▼                       ▼                        ▼                │
+│  ┌────────────────────────────────────────────────┐  ┌────────────────────────┐  │
+│  │            MANAGEMENT INTERFACES               │  │       SSH :22          │  │
+│  │ ┌───────────────────┐  ┌────────────────────┐  │  │                        │  │
+│  │ │ Cockpit :9090     │  │ Portainer :9443    │  │  │  ForceCommand routes   │  │
+│  │ │                   │  │                    │  │  │  student directly to   │  │
+│  │ │ • VM snapshots    │  │ • Stack deploy     │  │  │  container shell       │  │
+│  │ │ • Server metrics  │  │ • Container mgmt   │  │  │                        │  │
+│  │ │ • Terminal        │  │ • View logs        │  │  │  Student has NO        │  │
+│  │ └───────────────────┘  └────────────────────┘  │  │  access to VDS/VM      │  │
+│  │                                                │  │                        │  │
+│  │  Admin: full access                            │  └───────────┬────────────┘  │
+│  │  Instructor: limited (lab.sh + add-student.sh) │              │               │
+│  └────────────────────────┬───────────────────────┘              │               │
+│                           │                                      │               │
+│                           └──────────────┬───────────────────────┘               │
+│                                          │                                       │
+│                    ┌─────────────────────┴─────────────────────┐                 │
+│                    │        nftables FORWARD (virbr0)          │                 │
+│                    └─────────────────────┬─────────────────────┘                 │
+│                                          │                                       │
+│                                          ▼                                       │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │                         LAB-VM (192.168.122.10)                            │  │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │                           Docker Engine                              │  │  │
+│  │  │       ┌──────────────────────────────────────────────────────┐       │  │  │
+│  │  │       │  SCENARIO: base (deployed via Portainer Stack)       │       │  │  │
+│  │  │       └──────────────────────────────────────────────────────┘       │  │  │
+│  │  │                                                                      │  │  │
+│  │  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────────────┐  │  │  │
+│  │  │  │    red_net     │  │    blue_net    │  │     services_net       │  │  │  │
+│  │  │  │ 172.20.2.0/24  │  │ 172.20.1.0/24  │  │    172.20.3.0/24       │  │  │  │
+│  │  │  │                │  │                │  │                        │  │  │  │
+│  │  │  │ ┌─────┐┌─────┐ │  │ ┌─────┐┌─────┐ │  │   ┌─────────────────┐  │  │  │  │
+│  │  │  │ │red1 ││red2 │ │  │ │blue1││blue2│ │  │   │   workstation   │  │  │  │  │
+│  │  │  │ └─────┘└─────┘ │  │ └─────┘└─────┘ │  │   └────────┬────────┘  │  │  │  │
+│  │  │  │ ┌─────┐        │  │ ┌─────┐        │  │            │           │  │  │  │
+│  │  │  │ │red3 │        │  │ │blue3│        │  │            ▼           │  │  │  │
+│  │  │  │ └─────┘        │  │ └─────┘        │  │   ┌─────────────────┐  │  │  │  │
+│  │  │  │                │  │                │  │   │   webapp :8080  │  │  │  │  │
+│  │  │  │                │  │                │  │   └────────┬────────┘  │  │  │  │
+│  │  │  │                │  │                │  │            │           │  │  │  │
+│  │  │  │                │  │                │  │            ▼           │  │  │  │
+│  │  │  │                │  │                │  │   ┌─────────────────┐  │  │  │  │
+│  │  │  │                │  │                │  │   │    database     │  │  │  │  │
+│  │  │  │                │  │                │  │   └─────────────────┘  │  │  │  │
+│  │  │  └────────────────┘  └────────────────┘  └────────────────────────┘  │  │  │
+│  │  │                                                                      │  │  │
+│  │  │                  iptables: prep/combat phase (lab.sh)                │  │  │
+│  │  └──────────────────────────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                  TRAFFIC FLOWS                                   │
+├──────────────┬───────────────────────────────────────────────────────────────────┤
+│ 1. VPN       │ Internet → UDP 51820 → WireGuard tunnel → 10.200.0.x client IP    │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 2. Management│ Admin/Instructor via VPN → Cockpit (:9090) + Portainer (:9443)    │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 3. Lab       │ VPN → nftables FORWARD → virbr0 → Lab-VM (192.168.122.10)         │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 4. Student   │ VPN → SSH :22 → ForceCommand → Lab-VM SSH → docker exec → shell   │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 5. Service   │ red/blue container → iptables → services_net → webapp/database    │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 6. Prep      │ Containers → NAT masquerade → Internet (updates/research)         │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ 7. Combat    │ red_net ↔ blue_net traffic OPEN, Internet CLOSED                  │
+└──────────────┴───────────────────────────────────────────────────────────────────┘
+```
+
 ## Quick Start
 
 ### Prerequisites
@@ -72,7 +175,8 @@ VDS/
 │       └── 01-labvm-bootstrap.sh
 ├── scenarios/
 │   └── base/                 # Default lab scenario
-│       └── docker-compose.yml  # Deployed via Portainer from GitHub
+│       ├── docker-compose.yml    # Deployed via Portainer from GitHub
+│       └── workstation-activity.sh  # Traffic simulation script
 ├── scripts/
 │   ├── lab.sh                # Phase control CLI (runs on VDS)
 │   └── add-student.sh        # Student onboarding script
@@ -80,6 +184,8 @@ VDS/
 │   ├── architecture.md       # System architecture
 │   ├── security.md           # Security controls
 │   └── runbook.md            # Step-by-step deployment
+├── MASTER-DOCUMENTATION.md   # Complete reference documentation
+├── GITHUB-SETUP.md           # GitHub repository setup guide
 └── README.md
 ```
 

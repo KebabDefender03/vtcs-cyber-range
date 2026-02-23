@@ -165,52 +165,48 @@ Users created: labadmin1-3 (docker group), instructor1-2 (docker group).
 
 ---
 
-## Phase 3: Deploy Lab Scenarios
+## Phase 3: Deploy Lab Scenarios via Portainer
 
-### Step 3.1: Upload Scenario Files
+> **Note**: Docker Compose files are deployed directly from GitHub via Portainer. No local file upload required.
 
-```bash
-# From your local machine (in repo directory)
-# First, copy to VDS
-scp -r scenarios scripts root@10.200.0.1:/tmp/cyberlab/
+### Step 3.1: Access Portainer
 
-# Then from VDS to Lab VM
-ssh root@10.200.0.1
-scp -r /tmp/cyberlab/* labadmin1@192.168.122.X:/opt/cyberlab/
-```
+1. Connect VPN and access: https://10.200.0.1:9443
+2. Login with your Portainer credentials
+3. Navigate to **Stacks** on the left menu
 
-### Step 3.2: Start Lab Environment
+### Step 3.2: Deploy Stack from GitHub
 
-```bash
-# On Lab VM
-cd /opt/cyberlab
+1. Click **Add stack**
+2. Name: `vtcs` (or your preferred name)
+3. Select **Repository**
+4. Repository URL: `https://github.com/KebabDefender03/vtcs-cyber-range`
+5. Compose path: `scenarios/base/docker-compose.yml`
+6. Click **Deploy the stack**
 
-# Build and start containers
-docker compose -f scenarios/base/docker-compose.yml build
-docker compose -f scenarios/base/docker-compose.yml up -d
-```
-
-**Expected output**: All containers started.
+**Expected output**: All containers started (visible in Portainer → Containers).
 
 ### Step 3.3: Verify Lab Status
 
-Use Portainer (https://10.200.0.1:9443) or:
-
-```bash
-docker ps
-```
+Use Portainer (https://10.200.0.1:9443) to verify all containers are running:
+- red1, red2, red3 (Kali Linux)
+- blue1, blue2, blue3 (Kali Linux)
+- webapp (DVWA)
+- database (MySQL)
+- workstation (traffic generator)
 
 **Expected output**:
 ```
-NAME       STATUS         PORTS
-blue1      Up             22/tcp
-blue2      Up             22/tcp
-blue3      Up             22/tcp
-red1       Up             22/tcp
-red2       Up             22/tcp
-red3       Up             22/tcp
-webapp     Up             127.0.0.1:8080->80/tcp
-database   Up             3306/tcp
+NAME          STATUS         PORTS
+blue1         Up             22/tcp
+blue2         Up             22/tcp
+blue3         Up             22/tcp
+red1          Up             22/tcp
+red2          Up             22/tcp
+red3          Up             22/tcp
+webapp        Up             127.0.0.1:8080->80/tcp
+database      Up             3306/tcp
+workstation   Up             (none)
 ```
 
 ---
@@ -275,11 +271,13 @@ Send the student their package containing:
 ### Step 5.1: Clean State Snapshot
 
 ```bash
-# On VDS, ensure lab containers are fresh via Portainer
-# Or reset via docker on Lab VM:
+# On VDS, ensure lab containers are fresh:
+# Option 1: Via Portainer - Stacks → vtcs → Redeploy
+# Option 2: Via Lab VM CLI:
 ssh labvm
-docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml down -v
-docker compose -f /opt/cyberlab/scenarios/base/docker-compose.yml up -d
+docker stop $(docker ps -q)
+docker rm $(docker ps -aq)
+# Then redeploy stack via Portainer
 
 # Create snapshot from VDS
 virsh snapshot-create-as labvm clean-baseline "Clean lab baseline"
@@ -326,7 +324,6 @@ sudo /opt/cyberlab/scripts/lab.sh phase
 2. `sudo /opt/cyberlab/scripts/lab.sh prep` - Enable preparation phase (~30 min)
 3. **Blue team** (optional):
    - Can capture network traffic via tcpdump from their blue container
-   - Can deploy their own SIEM to analyze traffic (see [Blue Team SIEM Guide](blue-team-siem-guide.md))
    - Can SSH to workstation container if instructor enables it for log analysis
 4. **Red team** downloads attack tools and prepares exploits
 5. `sudo /opt/cyberlab/scripts/lab.sh combat` - Enable combat phase (rest of session)
@@ -342,18 +339,10 @@ During **Preparation Phase**, the blue team can:
    tcpdump -i eth0 -w /tmp/capture.pcap host webapp
    ```
 
-2. **Deploy optional SIEM** (if desired):
-   - Choose from Grafana+Loki, ELK, Wazuh, or manual analysis
-   - Deploy in their blue container or services_net
-   - Analyze captured traffic and workstation activity patterns
-   - See [Blue Team SIEM Guide](blue-team-siem-guide.md) for options
-
-3. **Analyze workstation activity**:
+2. **Analyze workstation activity**:
    - Workstation generates traffic every 10-30 seconds
    - Baseline: 2-5 HTTP requests/minute
    - Spike: >150 requests/minute = likely attack
-
-See [Blue Team SIEM Guide](blue-team-siem-guide.md) for detailed SIEM deployment options.
 
 ### End Lab Session
 
@@ -428,7 +417,7 @@ nft list ruleset | grep 9090
 ### Containers Not Starting
 
 1. Check Docker: `systemctl status docker`
-2. Check compose: `docker compose logs`
+2. Check Portainer logs: Access Portainer → Containers → select → Logs
 3. Check resources: `free -h`, `df -h`
 
 ### Lab VM Network Issues
@@ -453,8 +442,8 @@ nft list ruleset | grep 9090
 | services_net | 172.20.3.0/24 |
 | Admin VPN IPs | 10.200.0.10-19 (reserved) |
 | Instructor VPN IPs | 10.200.0.20-29 (reserved) |
-| Red Team VPN IPs | 10.200.0.100-109 |
-| Blue Team VPN IPs | 10.200.0.110-119 |
+| Red Team VPN IPs | 10.200.0.100-109 (reserved) |
+| Blue Team VPN IPs | 10.200.0.110-119 (reserved) |
 
 ### Default Credentials
 
